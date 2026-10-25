@@ -77,10 +77,13 @@ function makeWeather(season, random) {
   };
 }
 
-export function createClimate({ seed = 'climate', startMinutes = 360, startDay = 1, season = 'autumn' } = {}) {
+export function createClimate({ seed = 'climate', startMinutes = 360, startDay = 1, season = 'autumn', weather = null } = {}) {
   const rng = mulberry32(hashSeed(String(seed)));
   const random = () => rng();
-  const weather = makeWeather(season, random);
+  // Сохранённую погоду принимаем как есть: иначе после F5 игрок видит не то небо,
+  // под которым рыбачил, и сейв врёт про условия ловли.
+  const weatherIn = sanitizeWeather(weather);
+  const initial = weatherIn || makeWeather(season, random);
   return {
     rng,
     minutes: clamp(Number(startMinutes) || 0, 0, 1439),
@@ -89,11 +92,38 @@ export function createClimate({ seed = 'climate', startMinutes = 360, startDay =
     // Сезон первого дня — точка отсчёта. Без неё seasonOfDay(c.day, c.season)
     // считал бы пройденные сезоны от уже сдвинутого сезона и прокручивал круг каждый шаг.
     baseSeason: season,
-    weather,
+    weather: initial,
     changeTimer: 120 + random() * 300, // игровые минуты до пересмотра погоды
-    pressureHistory: [weather.pressure],
+    pressureHistory: [initial.pressure],
     weatherChanged: false,
     lastTimeOfDay: timeOfDayOf(startMinutes),
+  };
+}
+
+/**
+ * Привести сохранённую погоду к рабочему виду. Битые/чужие поля заменяются
+ * разумными значениями, чтобы климат никогда не стартовал с NaN.
+ */
+function sanitizeWeather(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const num = (v, fallback, min, max) => {
+    // null/'' приводить к числу нельзя: Number(null) === 0 и «нет ветра» молча
+    // превратится в «ветер 0°». Пустое значение — это именно отсутствие значения.
+    if (v === null || v === undefined || v === '') return fallback;
+    const n = Number(v);
+    if (!Number.isFinite(n)) return fallback;
+    return clamp(n, min, max);
+  };
+  const precip = ['none', 'rain', 'storm', 'snow'].includes(raw.precip) ? raw.precip : 'none';
+  return {
+    id: typeof raw.id === 'string' && raw.id ? raw.id : 'clear',
+    name: typeof raw.name === 'string' && raw.name ? raw.name : 'Ясно',
+    precip,
+    cloud: num(raw.cloud, 0.4, 0, 1),
+    windMs: num(raw.windMs, 3, 0, 40),
+    windDir: num(raw.windDir, 220, 0, 360),
+    pressure: num(raw.pressure, 1013, 950, 1080),
+    tempC: num(raw.tempC, 12, -50, 55),
   };
 }
 

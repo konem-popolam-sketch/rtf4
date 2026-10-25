@@ -90,7 +90,9 @@ function makeDome(disposables, top, bottom) {
   const mesh = new THREE.Mesh(geo, mat);
   mesh.frustumCulled = false;
   mesh.renderOrder = -1000;
-  return { mesh, mat, tex };
+  // canvas этой текстуры перерисовывается при смене времени суток — без новых текстур.
+  const canvas = tex.image && tex.image.width ? tex.image : null;
+  return { mesh, mat, tex, canvas };
 }
 
 /**
@@ -139,6 +141,7 @@ export function createSky({ scene, camera, ambient }) {
    */
   function update(state, view = {}) {
     if (!state) return exposure;
+    repaintCooldown = Math.max(0, repaintCooldown - (view.dt || 0.016));
     repaint(state.top, state.bottom);
     scene.background.set(state.fog);
     scene.fog.color.set(state.fog);

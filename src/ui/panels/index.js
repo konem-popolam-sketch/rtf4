@@ -25,6 +25,7 @@ const PANEL_MODULES = [
 
 const EMPTY_STATE = Object.freeze({});
 
+/** Контейнер панелей: #panels-root, при отсутствии создаём сами. */
 function panelsRoot() {
   let host = document.getElementById('panels-root');
   if (!host) {
@@ -44,72 +45,70 @@ function makeContainer(host, name) {
 }
 
 /**
- * @param {{bus:object, state?:object, actions?:object, root?:HTMLElement}} params
- * @returns {{open:(name:string, payload?:object)=>void, close:()=>void,
- *            isOpen:()=>string|null, toggle:(name:string)=>void, dispose:()=>void,
- *            names:string[], current:()=>string|null, refresh:()=>void}}
+ * Создаёт «ленивый» контекст: state/actions можно передать позже, панели
+ * всё равно получат актуальные значения на момент отрисовки.
  */
-export function initPanels({ bus, state, actions, root } = {}) {
-  if (!bus || typeof bus.on !== 'function') throw new TypeError('initPanels: bus обязателен');
-
-  const host = root || panelsRoot();
+function createRuntime(state, actions) {
   let stateRef = state || null;
   let actionsRef = actions || null;
-  let current = null;
-  let disposed = false;
-  const panels = new Map();
 
-  // Если капитан ещё не передал стор/действия — берём их позже, когда появятся.
-  const lazyState = () => {
-    if (stateRef) return stateRef;
-    const runtime = globalThis.RTF4;
-    return (runtime && runtime.state) || EMPTY_STATE;
-  };
-  const lazyActions = () => {
-    if (actionsRef) return actionsRef;
-    const runtime = globalThis.RTF4;
-    return (runtime && runtime.actions) || null;
-  };
+  const activeActions = () => (actionsRef && actionsRef.actions) || actionsRef || null;
 
-  const ctx = {
-    bus,
-    panel: '',
+  const mem = {
     get state() {
-      return lazyState();
+      if (stateRef) return stateRef;
+      const runtime = globalThis.RTF4;
+      return (runtime && runtime.state) || EMPTY_STATE;
     },
     get actions() {
-      return lazyActions();
+      const own = activeActions();
+      if (own) return own;
+      const runtime = globalThis.RTF4;
+      return (runtime && runtime.actions) || null;
+    },
+    setState(next) {
+      stateRef = next;
+    },
+    setActions(next) {
+      actionsRef = next;
+    },
+    hasState: () => Boolean(stateRef),
+    hasActions: () => Boolean(activeActions()),
+  };
+  return mem;
+}
+
+/** Создаёт контекст для конкретной панели (state/actions читаются на лету). */
+function panelContext(bus, runtime, name) {
+  return {
+    bus,
+    panel: name,
+    get state() {
+      return runtime.state;
+    },
+    get actions() {
+      return runtime.actions;
     },
   };
+}
 
+/** Монтирует все панели и возвращает карту имя → {panel, container}. */
+function mountAll(host, bus, runtime) {
+  const panels = new Map();
   for (const [name, mountFn] of PANEL_MODULES) {
     const container = makeContainer(host, name);
-    const panelCtx = {
-      bus,
-      panel: name,
-      get state() {
-        return lazyState();
-      },
-      get actions() {
-        return lazyActions();
-      },
-    };
-    const panel = mountFn(container, panelCtx);
+    const panel = mountFn(container, panelContext(bus, runtime, name));
     panels.set(name, { panel, container });
   }
+  return panels;
+}
 
-  function setPanelViaStore(name) {
-    const store = lazyState();
-    if (!store || !store.ui) return false;
-    const storeActions = lazyActions();
-    if (storeActions && typeof storeActions.setPanel === 'function') {
-      storeActions.setPanel(name);
-      return true;
-    }
-    return false;
-  }
+/** Переключение видимой панели: закрыть предыдущую, открыть следующую. */
+function createSwitcher(bus, runtime, panels) {
+  let current = null;
+  let disposed = false;
 
-  function apply(name) {
+  const apply = (name) => {
     if (disposed) return;
     const next = name && panels.has(name) ? name : null;
     if (next === current) return;
@@ -118,13 +117,19 @@ export function initPanels({ bus, state, actions, root } = {}) {
       if (prev) prev.panel.close();
     }
     current = next;
-    if (next) {
-      const entry = panels.get(next);
-      if (entry) entry.panel.open({ source: 'aggregator' });
-    }
-  }
+    if (next) panels.get(next).panel.open({ source: 'aggregator' });
+  };
 
-  function open(name, payload) {
+  /** Закрытие через стор, чтобы игра сняла паузу; иначе эмитим событие сами. */
+  const viaStore = (name) => {
+    const actions = runtime.actions;
+    const store = runtime.state;
+    if (!actions || typeof actions.setPanel !== 'function' || !store || !store.ui) return false;
+    actions.setPanel(name);
+    return true;
+  };
+
+  const open = (name, payload) => {
     if (!name || !panels.has(name)) {
       if (name) bus.emit('toast', { text: 'Такого экрана нет', kind: 'bad' });
       return;
@@ -134,95 +139,118 @@ export function initPanels({ bus, state, actions, root } = {}) {
       entry.panel.open(payload || {});
       return;
     }
-    if (setPanelViaStore(name)) {
-      if (payload && entry.panel.open) entry.panel.open(payload);
+    if (viaStore(name)) {
+      if (payload) entry.panel.open(payload);
       return;
     }
     bus.emit('ui:panel', { name });
     apply(name);
-  }
+  };
 
-  function close() {
+  const close = () => {
     if (!current) return;
-    if (setPanelViaStore(null)) return;
+    if (viaStore(null)) return;
     bus.emit('ui:panel', { name: null });
     apply(null);
-  }
+  };
 
-  function refresh() {
-    if (current) {
-      const entry = panels.get(current);
-      if (entry) entry.panel.render();
-    }
-  }
-
-  function toggle(name) {
-    if (current === name) close();
-    else open(name);
-  }
+  const refresh = () => {
+    if (!current) return;
+    const entry = panels.get(current);
+    if (entry) entry.panel.render();
+  };
 
   const onPanelEvent = (payload) => {
     const name = payload && typeof payload === 'object' ? payload.name : payload;
     apply(name || null);
   };
-  const offPanel = bus.on('ui:panel', onPanelEvent);
 
-  const onKeyDown = (event) => {
-    if (event.key !== 'Escape' || event.defaultPrevented) return;
-    if (!current) return;
-    event.preventDefault();
-    event.stopPropagation();
-    close();
-  };
-  window.addEventListener('keydown', onKeyDown, true);
-
-  const onWindowBlur = () => {
-    /* панель остаётся открытой: игра на паузе по своим правилам */
-  };
-  window.addEventListener('blur', onWindowBlur);
-
-  // Синхронизация с уже сохранённым открытым экраном из сейва/состояния.
-  const savedPanel = lazyState() && lazyState().ui && lazyState().ui.panel;
-  if (savedPanel && panels.has(savedPanel)) apply(savedPanel);
-
-  // Фолбэк: если state/actions не передали — подхватываем стор, когда он появится.
-  if (!stateRef || !actionsRef) {
-    Promise.all([
-      import('../../state/game.js').catch(() => null),
-      import('../../state/actions.js').catch(() => null),
-    ])
-      .then(([gameMod, actionsMod]) => {
-        if (disposed) return;
-        if (!stateRef && gameMod && typeof gameMod.getState === 'function') stateRef = gameMod.getState();
-        if (!actionsRef && actionsMod) actionsRef = actionsMod.actions || actionsMod.default || actionsMod;
-        if (current) refresh();
-      })
-      .catch(() => {
-        /* стор ещё не готов — панели откроются, когда капитан передаст его явно */
-      });
-  }
-
-  const instance = {
+  return {
     open,
     close,
-    toggle,
     refresh,
+    apply,
+    onPanelEvent,
+    toggle: (name) => (current === name ? close() : open(name)),
     isOpen: () => current,
-    current: () => current,
-    names: PANEL_MODULES.map(([name]) => name),
-    panels,
+    reset() {
+      current = null;
+    },
     dispose() {
       disposed = true;
-      offPanel();
-      window.removeEventListener('keydown', onKeyDown, true);
-      window.removeEventListener('blur', onWindowBlur);
-      for (const entry of panels.values()) entry.panel.dispose();
-      panels.clear();
       current = null;
     },
   };
+}
 
-  return instance;
+/** Горячая клавиша ESC: закрывает активную панель и снимает флаг события. */
+function bindEscape(switcher) {
+  const onKeyDown = (event) => {
+    if (event.key !== 'Escape' || event.defaultPrevented) return;
+    if (!switcher.isOpen()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    switcher.close();
+  };
+  window.addEventListener('keydown', onKeyDown, true);
+  return () => window.removeEventListener('keydown', onKeyDown, true);
+}
+
+/** Страховка: если state/actions не передали — подхватываем модули стора. */
+function loadStoreFallback(runtime, onReady) {
+  if (runtime.hasState() && runtime.hasActions()) return;
+  Promise.all([import('../../state/game.js').catch(() => null), import('../../state/actions.js').catch(() => null)])
+    .then(([gameMod, actionsMod]) => {
+      if (!runtime.hasState() && gameMod && typeof gameMod.getState === 'function') {
+        runtime.setState(gameMod.getState());
+      }
+      if (!runtime.hasActions() && actionsMod) runtime.setActions(actionsMod.actions || actionsMod);
+      onReady();
+    })
+    .catch(() => {
+      /* стор ещё не готов — панели откроются, когда капитан передаст его явно */
+    });
+}
+
+/**
+ * @param {{bus:object, state?:object, actions?:object, root?:HTMLElement}} params
+ * @returns {{open:(name:string, payload?:object)=>void, close:()=>void,
+ *            isOpen:()=>string|null, toggle:(name:string)=>void, dispose:()=>void,
+ *            names:string[], current:()=>string|null, refresh:()=>void}}
+ */
+export function initPanels({ bus, state, actions, root } = {}) {
+  if (!bus || typeof bus.on !== 'function') throw new TypeError('initPanels: bus обязателен');
+
+  const host = root || panelsRoot();
+  const runtime = createRuntime(state, actions);
+  const panels = mountAll(host, bus, runtime);
+  const switcher = createSwitcher(bus, runtime, panels);
+  const offPanel = bus.on('ui:panel', switcher.onPanelEvent);
+  const offEscape = bindEscape(switcher);
+
+  // Синхронизация с уже сохранённым открытым экраном из сейва/состояния.
+  const savedPanel = runtime.state && runtime.state.ui && runtime.state.ui.panel;
+  if (savedPanel && panels.has(savedPanel)) switcher.apply(savedPanel);
+
+  loadStoreFallback(runtime, switcher.refresh);
+
+  return {
+    open: switcher.open,
+    close: switcher.close,
+    toggle: switcher.toggle,
+    refresh: switcher.refresh,
+    isOpen: switcher.isOpen,
+    current: switcher.isOpen,
+    names: PANEL_MODULES.map(([name]) => name),
+    panels,
+    dispose() {
+      offPanel();
+      offEscape();
+      for (const entry of panels.values()) entry.panel.dispose();
+      panels.clear();
+      switcher.dispose();
+    },
+  };
 }
 
 export default initPanels;

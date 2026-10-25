@@ -141,16 +141,8 @@ function summaryLine(state, caught) {
   };
 }
 
-function renderAtlas(api) {
-  const view = api.view;
-  const { list, caught } = filtered(api);
-  const summary = summaryLine(api.state, caught);
-  const focusSearch = document.activeElement === api.sheet.body.querySelector('[data-role="search"]');
-
-  api.sheet.setSub(summary.html);
-  api.sheet.setExtra(`<span class="pn-kv"><span>Записей</span><b class="u-mono">${summary.opened}/${summary.total}</b></span>`);
-
-  api.sheet.body.innerHTML = `
+function atlasToolbar(view) {
+  return `
     <div class="pn-toolbar pn-toolbar--wrap">
       <label class="pn-field pn-field--search">
         <span>Поиск</span>
@@ -180,33 +172,38 @@ function renderAtlas(api) {
         <button class="pn-seg${view.mode === 'table' ? ' pn-seg--active' : ''}" type="button" data-act="mode" data-mode="table">Таблица</button>
         <button class="pn-seg${view.mode === 'cards' ? ' pn-seg--active' : ''}" type="button" data-act="mode" data-mode="cards">Карточки</button>
       </div>
-    </div>
-    ${
-      list.length === 0
-        ? emptyState('Ничего не найдено — измените фильтры.')
-        : view.mode === 'cards'
-        ? `<div class="pn-grid pn-grid--fish">${list.map((fish) => fishCard(fish, caught[fish.id])).join('')}</div>`
-        : `<div class="pn-tablewrap pn-tablewrap--tall">
-            <table class="pn-table pn-table--atlas">
-              <thead>
-                <tr>
-                  <th>Рыба</th><th>Редкость</th><th>Вес</th><th>Цена</th><th>Рекорд</th>
-                  <th>Поймано</th><th>Водоёмы</th><th>На что</th><th>Клёв</th>
-                </tr>
-              </thead>
-              <tbody>${list.map((fish) => fishRow(fish, caught[fish.id])).join('')}</tbody>
-            </table>
-          </div>`
-    }`;
+    </div>`;
+}
 
+function atlasList(view, list, caught) {
+  if (list.length === 0) return emptyState('Ничего не найдено — измените фильтры.');
+  if (view.mode === 'cards') {
+    return `<div class="pn-grid pn-grid--fish">${list.map((fish) => fishCard(fish, caught[fish.id])).join('')}</div>`;
+  }
+  return `
+    <div class="pn-tablewrap pn-tablewrap--tall">
+      <table class="pn-table pn-table--atlas">
+        <thead>
+          <tr>
+            <th>Рыба</th><th>Редкость</th><th>Вес</th><th>Цена</th><th>Рекорд</th>
+            <th>Поймано</th><th>Водоёмы</th><th>На что</th><th>Клёв</th>
+          </tr>
+        </thead>
+        <tbody>${list.map((fish) => fishRow(fish, caught[fish.id])).join('')}</tbody>
+      </table>
+    </div>`;
+}
+
+function atlasHandlers(api) {
   const offClick = bindDelegated(api.sheet.body, {
     mode(target) {
-      view.mode = target.dataset.mode === 'cards' ? 'cards' : 'table';
+      api.view.mode = target.dataset.mode === 'cards' ? 'cards' : 'table';
       api.render();
     },
   });
   const offInput = bindDelegatedInput(api.sheet.body, (target) => {
     const act = target.dataset.act;
+    const view = api.view;
     if (act === 'query') {
       view.query = target.value;
       api.render();
@@ -219,11 +216,25 @@ function renderAtlas(api) {
     else return;
     api.render();
   });
-  if (focusSearch) keepFocus(api.sheet.body.querySelector('[data-role="search"]'), true);
   return () => {
     offClick();
     offInput();
   };
+}
+
+function renderAtlas(api) {
+  const view = api.view;
+  const { list, caught } = filtered(api);
+  const summary = summaryLine(api.state, caught);
+  const oldSearch = api.sheet.body.querySelector('[data-role="search"]');
+  const focusSearch = oldSearch === document.activeElement;
+
+  api.sheet.setSub(summary.html);
+  api.sheet.setExtra(`<span class="pn-kv"><span>Записей</span><b class="u-mono">${summary.opened}/${summary.total}</b></span>`);
+  api.sheet.body.innerHTML = `${atlasToolbar(view)}${atlasList(view, list, caught)}`;
+
+  if (focusSearch) keepFocus(api.sheet.body.querySelector('[data-role="search"]'), true);
+  return atlasHandlers(api);
 }
 
 export function mount(root, ctx) {

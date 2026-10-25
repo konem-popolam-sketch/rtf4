@@ -98,6 +98,7 @@ export async function createRenderer({ canvas, state, bus } = {}) {
     const step = Number.isFinite(dt) ? Math.min(0.1, Math.max(0, dt)) : 0.016;
     if (ctx) lastCtx = ctx;
     lastSky = resolveSky(lastCtx, state, ambient);
+    view.dt = step;
     const exposure = sky.update(lastSky, view);
     if (gl) gl.toneMappingExposure = exposure;
     // Точка поплавка для 2D-фолбэка: знаем дистанцию заброса из ctx.cast.

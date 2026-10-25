@@ -4,8 +4,7 @@
  * Владелец: ui-programmer.
  */
 import { mountPanel, bindDelegated, bindDelegatedInput, clickSfx, equipBait, equipLure, setGear, setRig } from './shell.js';
-import { chip, emptyState, esc, RIG_NAMES } from './common.js';
-import {
+import { chip, emptyState, esc, RIG_NAMES } from './common.js';import {
   baitOf,
   baits,
   isRodFitsRig,
@@ -204,19 +203,11 @@ function rigSwitch(rig) {
   </div>`;
 }
 
-function renderTackle(api) {
+function tackleMarkup(api, gear, rig) {
   const state = api.state;
-  const gear = equipped(state);
-  const rig = gear.rig || 'float';
   const baitTab = rig !== 'spinning';
-  const money = Number(state && state.player && state.player.money) || 0;
-
-  api.sheet.setSub(`${RIG_NAMES[rig] || rig} · наживка: ${esc(baitOrLureName(gear, baitTab))}`);
-  api.sheet.setExtra(`<span class="pn-kv"><span>Уровень</span><b class="u-mono">${Number(state.player && state.player.level) || 1}</b></span>`);
-
   const rows = TACKLE_CATEGORIES.map((cat) => gearRow(cat, state, rig)).join('');
-
-  api.sheet.body.innerHTML = `
+  return `
     <div class="pn-columns pn-columns--tackle">
       <div class="pn-stack">
         <section class="pn-card">
@@ -240,7 +231,24 @@ function renderTackle(api) {
         <p class="pn-hint">Удилище не подходит под оснастку — выберите подходящее в списке. Расход наживки и износ приманки идут на рыбалке.</p>
       </div>
     </div>`;
+}
 
+function gearChanged(api, target) {
+  const slot = target.dataset.slot;
+  const id = target.value;
+  if (!slot || !id) return;
+  clickSfx(api.bus);
+  if (slot === 'rodId') {
+    const rod = tackleOf(id);
+    const currentRig = equipped(api.state).rig || 'float';
+    if (rod && !isRodFitsRig(rod, currentRig)) {
+      api.bus.emit('toast', { text: `«${rod.name}» не подходит под оснастку «${RIG_NAMES[currentRig]}»`, kind: 'bad' });
+    }
+  }
+  setGear(api.actions, api.bus, { [slot]: id });
+}
+
+function tackleHandlers(api) {
   const offClick = bindDelegated(api.sheet.body, {
     rig(target) {
       const next = target.dataset.rig;
@@ -259,24 +267,26 @@ function renderTackle(api) {
     },
   });
   const offInput = bindDelegatedInput(api.sheet.body, (target) => {
-    if (target.dataset.act !== 'gear') return;
-    const slot = target.dataset.slot;
-    const id = target.value;
-    if (!slot || !id) return;
-    clickSfx(api.bus);
-    if (slot === 'rodId') {
-      const rod = tackleOf(id);
-      const currentRig = (equipped(api.state).rig || 'float');
-      if (rod && !isRodFitsRig(rod, currentRig)) {
-        api.bus.emit('toast', { text: `«${rod.name}» не подходит под оснастку «${RIG_NAMES[currentRig]}»`, kind: 'bad' });
-      }
-    }
-    setGear(api.actions, api.bus, { [slot]: id });
+    if (target.dataset.act === 'gear') gearChanged(api, target);
   });
   return () => {
     offClick();
     offInput();
   };
+}
+
+function renderTackle(api) {
+  const state = api.state;
+  const gear = equipped(state);
+  const rig = gear.rig || 'float';
+  const baitTab = rig !== 'spinning';
+
+  api.sheet.setSub(`${RIG_NAMES[rig] || rig} · наживка: ${esc(baitOrLureName(gear, baitTab))}`);
+  api.sheet.setExtra(
+    `<span class="pn-kv"><span>Уровень</span><b class="u-mono">${Number(state.player && state.player.level) || 1}</b></span>`,
+  );
+  api.sheet.body.innerHTML = tackleMarkup(api, gear, rig);
+  return tackleHandlers(api);
 }
 
 function baitOrLureName(gear, baitTab) {

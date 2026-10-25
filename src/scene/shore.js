@@ -11,14 +11,13 @@ const BANK_Z = 1;      // линия уреза воды
 const SAND_DEPTH = 7;  // ширина песчаной полосы
 const GRASS_FAR = 120; // докуда тянется трава
 
-/** Клонировать текстуру берега с нужным повтором (сам canvas общий). */
+/** Настроить повтор уже созданной текстуры (clone не берём: shared source при dispose опасен). */
 function tiled(tex, rx, ry) {
-  const t = tex.clone();
-  t.needsUpdate = true;
-  t.wrapS = THREE.RepeatWrapping;
-  t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(rx, ry);
-  return t;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(rx, ry);
+  tex.needsUpdate = true;
+  return tex;
 }
 
 /** Горизонтальная плоскость берега с текстурой. */

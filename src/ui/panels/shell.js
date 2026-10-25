@@ -20,10 +20,45 @@ export function mountPanel(root, ctx, cfg) {
     subtitle: cfg.subtitle || '',
     className: cfg.className || '',
   });
+  const view = cfg.makeView ? cfg.makeView() : {};
+  const life = createLifecycle(root, ctx, cfg, sheet, view);
+
+  const offs = (cfg.events || ['state:changed']).map((name) => bus.on(name, life.render));
+
+  sheet.onClose(life.requestClose);
+  root.addEventListener('mousedown', life.onBackdrop);
+
+  return {
+    open: life.open,
+    close: life.close,
+    dispose: () => {
+      offs.forEach((off) => off());
+      root.removeEventListener('mousedown', life.onBackdrop);
+      life.dispose();
+    },
+    render: life.render,
+    get isOpen() {
+      return life.isOpen();
+    },
+  };
+}
+
+/** Жизненный цикл панели: открытие/закрытие, перерисовка, очистка обработчиков. */
+function createLifecycle(root, ctx, cfg, sheet, view) {
+  const { bus } = ctx;
   let opened = false;
   let payload = null;
   let cleanup = null;
-  const view = cfg.makeView ? cfg.makeView() : {};
+
+  const runCleanup = () => {
+    if (!cleanup) return;
+    try {
+      cleanup();
+    } catch {
+      /* обработчики могли быть удалены вместе с DOM */
+    }
+    cleanup = null;
+  };
 
   const api = () => ({
     sheet,
@@ -33,42 +68,26 @@ export function mountPanel(root, ctx, cfg) {
     panel: ctx.panel || cfg.name || '',
     payload,
     view,
-    render: () => render(),
-    close: () => requestClose(),
+    render: render,
+    close: requestClose,
   });
 
-  const render = () => {
+  function render() {
     if (!opened) return;
-    if (cleanup) {
-      try {
-        cleanup();
-      } catch {
-        /* панель уже могла быть разобрана */
-      }
-      cleanup = null;
-    }
+    runCleanup();
     const result = cfg.render(api());
     if (typeof result === 'function') cleanup = result;
-  };
+  }
 
-  const offs = (cfg.events || ['state:changed']).map((name) => bus.on(name, render));
-
-  const close = () => {
+  function close() {
     if (!opened) return;
     opened = false;
     root.hidden = true;
-    if (cleanup) {
-      try {
-        cleanup();
-      } catch {
-        /* обработчики могли быть удалены вместе с DOM */
-      }
-      cleanup = null;
-    }
+    runCleanup();
     if (cfg.onClose) cfg.onClose();
-  };
+  }
 
-  const open = (data) => {
+  function open(data) {
     payload = data && typeof data === 'object' ? data : null;
     if (!opened) {
       opened = true;
@@ -76,44 +95,31 @@ export function mountPanel(root, ctx, cfg) {
     }
     if (cfg.onOpen) cfg.onOpen(view, payload);
     render();
-  };
+  }
 
-  const requestClose = () => {
+  function requestClose() {
     bus.emit('ui:panel', { name: null });
     close();
-  };
+  }
 
-  sheet.onClose(requestClose);
-  const onBackdrop = (event) => {
+  function onBackdrop(event) {
     if (event.target === root) requestClose();
-  };
-  root.addEventListener('mousedown', onBackdrop);
-
-  const dispose = () => {
-    offs.forEach((off) => off());
-    root.removeEventListener('mousedown', onBackdrop);
-    if (cleanup) {
-      try {
-        cleanup();
-      } catch {
-        /* ignore */
-      }
-      cleanup = null;
-    }
-    if (cfg.onDispose) cfg.onDispose();
-    root.innerHTML = '';
-    root.classList.remove('pn-mount');
-    root.hidden = true;
-  };
+  }
 
   return {
     open,
     close,
-    dispose,
     render,
-    get isOpen() {
-      return opened;
+    requestClose,
+    onBackdrop,
+    dispose() {
+      runCleanup();
+      if (cfg.onDispose) cfg.onDispose();
+      root.innerHTML = '';
+      root.classList.remove('pn-mount');
+      root.hidden = true;
     },
+    isOpen: () => opened,
   };
 }
 

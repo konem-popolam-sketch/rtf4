@@ -123,6 +123,56 @@ function selectedWater(api) {
   return waterOf(wanted) || waters[0] || null;
 }
 
+function activeLine(activeWater, activeSpot) {
+  if (!activeWater) return '';
+  const spotText = activeSpot ? `, точка «${esc(activeSpot.name || activeSpot.id)}»` : '';
+  return `<p class="pn-hint">Сейчас вы на «${esc(activeWater.name)}»${spotText}.</p>`;
+}
+
+function mapBody(water, state, info) {
+  const right = info.locked
+    ? `<div class="pn-lock">Водоём откроется на ${Number(water.unlockLevel) || 1}-м уровне. Сейчас ваш уровень — ${info.level}.</div>`
+    : spotsTable(water, state);
+  return `
+    <div class="pn-columns pn-columns--map">
+      <aside class="pn-waterlist">
+        ${waters.map((w) => waterCard(w, state, w.id === water.id)).join('')}
+        ${activeLine(info.activeWater, info.activeSpot)}
+      </aside>
+      <div class="pn-stack pn-stack--map">
+        ${waterInfo(water)}
+        ${right}
+      </div>
+    </div>`;
+}
+
+function mapHandlers(api) {
+  return bindDelegated(api.sheet.body, {
+    'pick-water'(target) {
+      const id = target.dataset.id;
+      if (!id || id === api.view.waterId) return;
+      clickSfx(api.bus);
+      api.view.waterId = id;
+      api.payload = null;
+      api.render();
+    },
+    goto(target) {
+      const waterId = target.dataset.water;
+      const spotId = target.dataset.spot;
+      const water = waterOf(waterId);
+      if (!water || !spotOf(waterId, spotId)) return;
+      if (levelOf(api.state) < (Number(water.unlockLevel) || 1)) {
+        api.bus.emit('toast', { text: `«${water.name}» откроется на ${water.unlockLevel}-м уровне`, kind: 'bad' });
+        return;
+      }
+      clickSfx(api.bus);
+      if (api.actions && typeof api.actions.setWater === 'function') api.actions.setWater(waterId);
+      if (api.actions && typeof api.actions.setSpot === 'function') api.actions.setSpot(spotId);
+      api.close();
+    },
+  });
+}
+
 function renderMap(api) {
   const state = api.state;
   const level = levelOf(state);
@@ -141,53 +191,8 @@ function renderMap(api) {
 
   api.view.waterId = water.id;
   const locked = level < (Number(water.unlockLevel) || 1);
-
-  api.sheet.body.innerHTML = `
-    <div class="pn-columns pn-columns--map">
-      <aside class="pn-waterlist">
-        ${waters.map((w) => waterCard(w, state, w.id === water.id)).join('')}
-        ${
-          activeWater
-            ? `<p class="pn-hint">Сейчас вы на «${esc(activeWater.name)}»${
-                activeSpot ? `, точка «${esc(activeSpot.name || activeSpot.id)}»` : ''
-              }.</p>`
-            : ''
-        }
-      </aside>
-      <div class="pn-stack pn-stack--map">
-        ${waterInfo(water)}
-        ${
-          locked
-            ? `<div class="pn-lock">Водоём откроется на ${Number(water.unlockLevel) || 1}-м уровне. Сейчас ваш уровень — ${level}.</div>`
-            : spotsTable(water, state)
-        }
-      </div>
-    </div>`;
-
-  return bindDelegated(api.sheet.body, {
-    'pick-water'(target) {
-      const id = target.dataset.id;
-      if (!id || id === api.view.waterId) return;
-      clickSfx(api.bus);
-      api.view.waterId = id;
-      api.payload = null;
-      api.render();
-    },
-    goto(target) {
-      const waterId = target.dataset.water;
-      const spotId = target.dataset.spot;
-      const w = waterOf(waterId);
-      if (!w || !spotOf(waterId, spotId)) return;
-      if (levelOf(api.state) < (Number(w.unlockLevel) || 1)) {
-        api.bus.emit('toast', { text: `«${w.name}» откроется на ${w.unlockLevel}-м уровне`, kind: 'bad' });
-        return;
-      }
-      clickSfx(api.bus);
-      if (api.actions && typeof api.actions.setWater === 'function') api.actions.setWater(waterId);
-      if (api.actions && typeof api.actions.setSpot === 'function') api.actions.setSpot(spotId);
-      api.close();
-    },
-  });
+  api.sheet.body.innerHTML = mapBody(water, state, { locked, level, activeWater, activeSpot });
+  return mapHandlers(api);
 }
 
 export function mount(root, ctx) {

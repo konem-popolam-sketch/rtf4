@@ -116,14 +116,9 @@ function hotkeysBlock() {
     .join('')}</div>`;
 }
 
-function renderSettings(api) {
-  const state = api.state;
-  const view = api.view;
+function settingsMarkup(state, view) {
   const { volume, timeScale } = settingsOf(state);
-  api.sheet.setSub('Звук, время и профиль');
-  api.sheet.setExtra('<span class="pn-sub">изменения сохраняются сразу</span>');
-
-  api.sheet.body.innerHTML = `
+  return `
     <div class="pn-columns pn-columns--settings">
       <section class="pn-card">
         <h3 class="pn-card__title">Звук</h3>
@@ -148,12 +143,25 @@ function renderSettings(api) {
         </section>
       </div>
     </div>`;
+}
 
+function requestedReset(api) {
+  const view = api.view;
+  view.confirmReset = false;
+  if (api.actions && typeof api.actions.resetSave === 'function') {
+    api.bus.emit('toast', { text: 'Сейв сброшен, перезагрузка…', kind: 'info' });
+    api.actions.resetSave();
+  } else {
+    api.bus.emit('toast', { text: 'Сброс сейва пока недоступен', kind: 'bad' });
+  }
+}
+
+function settingsHandlers(api) {
+  const view = api.view;
   const offClick = bindDelegated(api.sheet.body, {
     'time-preset'(target) {
-      const scale = Number(target.dataset.scale) || 1;
       clickSfx(api.bus);
-      applyTimeScale(api, scale);
+      applyTimeScale(api, Number(target.dataset.scale) || 1);
     },
     'reset-ask'() {
       clickSfx(api.bus);
@@ -167,13 +175,7 @@ function renderSettings(api) {
     },
     'reset-confirm'() {
       clickSfx(api.bus);
-      view.confirmReset = false;
-      if (api.actions && typeof api.actions.resetSave === 'function') {
-        api.bus.emit('toast', { text: 'Сейв сброшен, перезагрузка…', kind: 'info' });
-        api.actions.resetSave();
-      } else {
-        api.bus.emit('toast', { text: 'Сброс сейва пока недоступен', kind: 'bad' });
-      }
+      requestedReset(api);
     },
   });
 
@@ -188,8 +190,7 @@ function renderSettings(api) {
       return;
     }
     if (act === 'time') {
-      const scale = Math.max(1, Math.min(8, Math.round(Number(target.value) || 1)));
-      applyTimeScale(api, scale);
+      applyTimeScale(api, Math.max(1, Math.min(8, Math.round(Number(target.value) || 1))));
     }
   });
 
@@ -197,6 +198,13 @@ function renderSettings(api) {
     offClick();
     offInput();
   };
+}
+
+function renderSettings(api) {
+  api.sheet.setSub('Звук, время и профиль');
+  api.sheet.setExtra('<span class="pn-sub">изменения сохраняются сразу</span>');
+  api.sheet.body.innerHTML = settingsMarkup(api.state, api.view);
+  return settingsHandlers(api);
 }
 
 function applyVolume(api, patch) {
