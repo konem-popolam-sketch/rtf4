@@ -1,0 +1,18 @@
+# Исключения: мусор от разработки, инструменты и секреты не публикуются.
+.agent-teams/
+.npmcache/
+.chrome-profile/
+.edge-profile/
+.chrome-shot-profile/
+.cf*.log
+.cf*.err
+.serve.log
+.serve.err
+shots/
+test-tunnel/
+tools/.gh-token.txt
+tools/cloudflared.exe
+node_modules/
+
+g-block.txt
+p-block.txt

@@ -1,0 +1,337 @@
+/* ==========================================================================
+   Базовый слой: токены, сброс, каркас страницы.
+   Владелец: капитан.
+   ========================================================================== */
+
+:root {
+  /* Палитра «Русской рыбалки»: глубокая вода, латунь, тёплый песок. */
+  --c-water-deep: #0a1c26;
+  --c-water-mid: #123240;
+  --c-water-light: #1d5468;
+  --c-night: #060d12;
+  --c-panel: rgba(10, 22, 28, 0.92);
+  --c-panel-2: rgba(16, 34, 42, 0.96);
+  --c-panel-edge: rgba(126, 178, 191, 0.28);
+  --c-panel-edge-strong: rgba(150, 205, 219, 0.5);
+  --c-text: #e8f1f4;
+  --c-text-dim: #9db4bd;
+  --c-text-mute: #6d8791;
+  --c-accent: #d6a545;
+  --c-accent-2: #f0cf8a;
+  --c-brass: #d9b166;
+  --c-brass-dark: #8a6a2c;
+  --c-good: #5fbf7f;
+  --c-warn: #e0a63c;
+  --c-bad: #d9604f;
+  --c-skill: #5fa8d3;
+
+  --radius-s: 4px;
+  --radius-m: 8px;
+  --radius-l: 14px;
+
+  --shadow-panel: 0 18px 48px rgba(0, 0, 0, 0.55), 0 2px 0 rgba(255, 255, 255, 0.04) inset;
+  --shadow-text: 0 1px 2px rgba(0, 0, 0, 0.85);
+
+  --font-ui: 'Segoe UI', 'Inter', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  --font-title: 'Georgia', 'Times New Roman', serif;
+  --font-mono: 'Cascadia Mono', 'Consolas', 'SF Mono', monospace;
+
+  --hud-pad: 16px;
+  --z-scene: 0;
+  --z-hud: 10;
+  --z-panels: 30;
+  --z-toast: 60;
+  --z-loader: 80;
+  --z-fatal: 100;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #03090c;
+  color: var(--c-text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 20%, #10222b 0%, #03090c 70%);
+}
+
+#scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: var(--z-scene);
+  outline: none;
+}
+
+#hud-root {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-hud);
+  pointer-events: none;
+}
+
+#panels-root {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-panels);
+  pointer-events: none;
+}
+
+.toast-root {
+  position: absolute;
+  inset: auto 0 120px 0;
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+/* Кликабельные элементы внутри HUD/панелей включают pointer-events сами. */
+#hud-root .interactive,
+#panels-root .interactive,
+button,
+input,
+select,
+textarea,
+a {
+  pointer-events: auto;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 600;
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.25);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(150, 205, 219, 0.22);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(150, 205, 219, 0.38);
+}
+
+/* Общие служебные классы, которыми пользуются все панели. */
+.u-hidden {
+  display: none !important;
+}
+.u-dim {
+  color: var(--c-text-dim);
+}
+.u-mute {
+  color: var(--c-text-mute);
+}
+.u-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.u-gold {
+  color: var(--c-brass);
+}
+.u-good {
+  color: var(--c-good);
+}
+.u-bad {
+  color: var(--c-bad);
+}
+.u-center {
+  text-align: center;
+}
+.u-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.u-spacer {
+  flex: 1 1 auto;
+}
+
+/* Карточка-панель — основа всех модальных окон. */
+.panel-sheet {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: min(1120px, 92vw);
+  max-height: min(760px, 88vh);
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--c-panel-2), var(--c-panel));
+  border: 1px solid var(--c-panel-edge-strong);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+  pointer-events: auto;
+  backdrop-filter: blur(9px);
+}
+
+.panel-sheet__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--c-panel-edge);
+  background: linear-gradient(180deg, rgba(214, 165, 69, 0.1), transparent);
+}
+
+.panel-sheet__title {
+  font-family: var(--font-title);
+  font-size: 19px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-brass);
+}
+
+.panel-sheet__body {
+  padding: 16px 18px;
+  overflow: auto;
+  flex: 1 1 auto;
+}
+
+.panel-sheet__close {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--c-panel-edge);
+  color: var(--c-text-dim);
+  font-size: 18px;
+  line-height: 1;
+}
+.panel-sheet__close:hover {
+  color: var(--c-text);
+  border-color: var(--c-panel-edge-strong);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Кнопки */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--c-panel-edge-strong);
+  background: linear-gradient(180deg, rgba(29, 84, 104, 0.55), rgba(10, 28, 38, 0.75));
+  color: var(--c-text);
+  letter-spacing: 0.03em;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.btn:hover {
+  background: linear-gradient(180deg, rgba(40, 110, 135, 0.7), rgba(14, 38, 50, 0.85));
+  border-color: rgba(180, 225, 238, 0.7);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn--primary {
+  border-color: var(--c-brass);
+  background: linear-gradient(180deg, #c9963b, #8a6a2c);
+  color: #1b1205;
+  font-weight: 600;
+}
+.btn--primary:hover {
+  background: linear-gradient(180deg, #e0ad4e, #9b7733);
+}
+.btn--danger {
+  border-color: rgba(217, 96, 79, 0.7);
+  background: linear-gradient(180deg, rgba(120, 40, 32, 0.7), rgba(60, 18, 14, 0.8));
+}
+.btn--ghost {
+  background: transparent;
+}
+.btn--sm {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+/* Фатальная ошибка */
+.fatal {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-fatal);
+  background: rgba(3, 9, 12, 0.96);
+  color: #ffd7d0;
+  padding: 40px;
+  overflow: auto;
+}
+.fatal h2 {
+  color: var(--c-bad);
+  margin-bottom: 16px;
+}
+.fatal pre {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  color: #f0b9b0;
+}
+
+@media (max-width: 900px) {
+  :root {
+    --hud-pad: 10px;
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "russkaya-rybalka-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Русская Рыбалка 4 — браузерный ремейк (фанатская реализация)",
+  "scripts": {
+    "start": "node tools/serve.cjs 8080 .",
+    "dev": "node tools/serve.cjs 8080 .",
+    "check": "node tools/check-all.mjs",
+    "test": "node tools/selftest.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

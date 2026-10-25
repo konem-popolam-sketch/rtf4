@@ -1,0 +1,98 @@
+/* Загрузочный экран. Владелец: art-audio-programmer. */
+
+.loader {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-loader, 80);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background:
+    radial-gradient(circle at 50% 32%, rgba(29, 84, 104, 0.42), transparent 55%),
+    linear-gradient(180deg, #04121a 0%, #03090c 100%);
+  transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+
+.loader--hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.loader__logo canvas {
+  width: min(520px, 80vw);
+  height: auto;
+  filter: drop-shadow(0 10px 28px rgba(214, 165, 69, 0.25));
+}
+
+.loader__title {
+  font-family: var(--font-title, Georgia, serif);
+  font-size: clamp(24px, 4vw, 40px);
+  letter-spacing: 0.18em;
+  color: #e8d5a8;
+  text-shadow: 0 2px 18px rgba(214, 165, 69, 0.4);
+}
+
+.loader__subtitle {
+  font-size: 13px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(157, 180, 189, 0.85);
+}
+
+.loader__bar {
+  margin-top: 22px;
+  width: min(420px, 62vw);
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  border: 1px solid rgba(150, 205, 219, 0.18);
+}
+
+.loader__bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #8a6a2c, #d6a545 60%, #f0cf8a);
+  transition: width 0.35s ease;
+  box-shadow: 0 0 12px rgba(214, 165, 69, 0.6);
+}
+
+.loader__status {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: rgba(157, 180, 189, 0.9);
+  min-height: 18px;
+}
+
+.loader__start {
+  margin-top: 18px;
+  padding: 14px 34px;
+  border-radius: 6px;
+  border: 1px solid #d6a545;
+  background: linear-gradient(180deg, #c9963b, #8a6a2c);
+  color: #1b1205;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  box-shadow: 0 10px 30px rgba(214, 165, 69, 0.3);
+  transition: transform 0.12s ease, filter 0.15s ease;
+}
+.loader__start:hover {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+}
+.loader__start:active {
+  transform: translateY(1px);
+}
+
+.loader__hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: rgba(109, 135, 145, 0.9);
+  letter-spacing: 0.05em;
+}

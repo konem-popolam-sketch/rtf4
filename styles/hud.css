@@ -1,0 +1,503 @@
+/* ==========================================================================
+   HUD: шапка, снасть, хотбар, индикаторы поклёвки и вываживания.
+   Владелец: ui-programmer.
+   ========================================================================== */
+
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ---------- Верхняя панель ---------- */
+.hud-top {
+  position: absolute;
+  top: var(--hud-pad);
+  left: var(--hud-pad);
+  right: var(--hud-pad);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.hud-cluster {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-radius: var(--radius-m);
+  background: linear-gradient(180deg, rgba(9, 22, 28, 0.88), rgba(6, 15, 20, 0.82));
+  border: 1px solid var(--c-panel-edge);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(6px);
+}
+
+.hud-money {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-brass);
+  text-shadow: var(--shadow-text);
+}
+
+.hud-level {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 132px;
+}
+
+.hud-level__label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c-text-dim);
+}
+
+.hud-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.hud-bar__fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+.hud-bar__fill--xp {
+  background: linear-gradient(90deg, #3f7f9b, #6fd0e8);
+}
+.hud-bar__fill--energy {
+  background: linear-gradient(90deg, #4f8a3a, #8ed06a);
+}
+.hud-bar__fill--satiety {
+  background: linear-gradient(90deg, #8a6a2c, #d6a545);
+}
+
+.hud-vitals {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 96px;
+}
+
+.hud-vital {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--c-text-dim);
+}
+.hud-vital .hud-bar {
+  flex: 1;
+}
+.hud-vital__icon {
+  width: 14px;
+  text-align: center;
+  font-size: 11px;
+}
+
+.hud-time {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.25;
+}
+.hud-time__clock {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.hud-time__day {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-text-dim);
+}
+
+.hud-weather {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hud-weather__icon {
+  font-size: 18px;
+  line-height: 1;
+}
+.hud-weather__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  font-size: 11px;
+  color: var(--c-text-dim);
+}
+.hud-weather__temp {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--c-text);
+}
+
+/* ---------- Панель снасти (справа) ---------- */
+.hud-tackle {
+  position: absolute;
+  top: 96px;
+  right: var(--hud-pad);
+  width: 232px;
+  padding: 10px 12px;
+  border-radius: var(--radius-m);
+  background: linear-gradient(180deg, rgba(9, 22, 28, 0.88), rgba(6, 15, 20, 0.8));
+  border: 1px solid var(--c-panel-edge);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+  font-size: 11px;
+  backdrop-filter: blur(6px);
+}
+
+.hud-tackle__title {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-brass);
+  margin-bottom: 7px;
+}
+
+.hud-tackle__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+  color: var(--c-text-dim);
+}
+.hud-tackle__row b {
+  color: var(--c-text);
+  font-weight: 500;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 130px;
+}
+
+/* ---------- Хотбар (низ) ---------- */
+.hud-hotbar {
+  position: absolute;
+  bottom: var(--hud-pad);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  padding: 6px;
+  border-radius: var(--radius-m);
+  background: linear-gradient(180deg, rgba(9, 22, 28, 0.9), rgba(6, 15, 20, 0.84));
+  border: 1px solid var(--c-panel-edge);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+  backdrop-filter: blur(6px);
+}
+
+.hud-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 74px;
+  padding: 7px 10px 6px;
+  border-radius: var(--radius-s);
+  border: 1px solid transparent;
+  color: var(--c-text-dim);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.hud-slot:hover {
+  background: rgba(150, 205, 219, 0.1);
+  color: var(--c-text);
+}
+.hud-slot--active {
+  border-color: var(--c-brass);
+  background: rgba(214, 165, 69, 0.14);
+  color: var(--c-text);
+}
+.hud-slot--busy {
+  border-color: rgba(150, 205, 219, 0.5);
+  box-shadow: 0 0 0 1px rgba(150, 205, 219, 0.18) inset;
+}
+.hud-slot__key {
+  position: absolute;
+  top: 3px;
+  left: 5px;
+  font-size: 9px;
+  color: var(--c-text-mute);
+  font-family: var(--font-mono);
+}
+.hud-slot__icon {
+  font-size: 17px;
+  line-height: 1;
+}
+.hud-slot__label {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.hud-slot[disabled] {
+  opacity: 0.38;
+}
+
+/* ---------- Индикатор поклёвки ---------- */
+.hud-bite {
+  position: absolute;
+  bottom: 108px;
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 9px 18px;
+  border-radius: var(--radius-m);
+  background: rgba(6, 15, 20, 0.86);
+  border: 1px solid rgba(214, 165, 69, 0.5);
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: none;
+}
+.hud-bite--visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.hud-bite--strike {
+  animation: bitePulse 0.42s ease-in-out infinite alternate;
+  border-color: var(--c-warn);
+}
+@keyframes bitePulse {
+  from {
+    box-shadow: 0 0 0 0 rgba(224, 166, 60, 0.45);
+  }
+  to {
+    box-shadow: 0 0 22px 4px rgba(224, 166, 60, 0.55);
+  }
+}
+.hud-bite__title {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-brass);
+}
+.hud-bite__hint {
+  font-size: 12px;
+  color: var(--c-text);
+}
+
+/* ---------- Вываживание ---------- */
+.hud-fight {
+  position: absolute;
+  left: 50%;
+  bottom: 108px;
+  transform: translateX(-50%);
+  width: min(560px, 78vw);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 16px;
+  border-radius: var(--radius-m);
+  background: linear-gradient(180deg, rgba(9, 22, 28, 0.93), rgba(6, 15, 20, 0.88));
+  border: 1px solid var(--c-panel-edge-strong);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+.hud-fight[hidden] {
+  display: none;
+}
+.hud-fight__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-text-dim);
+}
+.hud-fight__fish {
+  color: var(--c-brass);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+.hud-fight__gauge {
+  position: relative;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  border: 1px solid rgba(150, 205, 219, 0.22);
+}
+.hud-fight__tension {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4f8a3a, #8ed06a 40%, #e0a63c 62%, #d9604f 82%, #ff6b57);
+  transition: width 0.08s linear;
+}
+.hud-fight__danger {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 18%;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(217, 96, 79, 0.32) 0 6px,
+    rgba(217, 96, 79, 0.12) 6px 12px
+  );
+  pointer-events: none;
+}
+.hud-fight__stamina {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  background: rgba(95, 168, 211, 0.28);
+  transition: width 0.12s linear;
+}
+.hud-fight__stats {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--c-text-dim);
+}
+.hud-fight__warn {
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c-bad);
+  min-height: 14px;
+}
+
+/* ---------- Уведомления ---------- */
+.toast-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.hud-toast {
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(6, 15, 20, 0.9);
+  border: 1px solid var(--c-panel-edge-strong);
+  font-size: 12px;
+  color: var(--c-text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  animation: toastIn 0.22s ease, toastOut 0.3s ease 3.1s forwards;
+}
+.hud-toast--good {
+  border-color: rgba(95, 191, 127, 0.7);
+  color: #cfefd8;
+}
+.hud-toast--bad {
+  border-color: rgba(217, 96, 79, 0.7);
+  color: #ffd9d2;
+}
+.hud-toast--gold {
+  border-color: rgba(214, 165, 69, 0.8);
+  color: #f4e2b8;
+}
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes toastOut {
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* ---------- Журнал ---------- */
+.hud-log {
+  position: absolute;
+  left: var(--hud-pad);
+  bottom: var(--hud-pad);
+  width: 300px;
+  max-height: 168px;
+  padding: 8px 10px;
+  border-radius: var(--radius-m);
+  background: rgba(6, 15, 20, 0.72);
+  border: 1px solid var(--c-panel-edge);
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--c-text-dim);
+}
+.hud-log__line {
+  padding: 1px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hud-log__line--gold {
+  color: var(--c-brass);
+}
+.hud-log__time {
+  color: var(--c-text-mute);
+  font-family: var(--font-mono);
+  margin-right: 6px;
+}
+
+/* ---------- Подсказка управления ---------- */
+.hud-hint {
+  position: absolute;
+  right: var(--hud-pad);
+  bottom: var(--hud-pad);
+  max-width: 240px;
+  padding: 8px 11px;
+  border-radius: var(--radius-m);
+  background: rgba(6, 15, 20, 0.66);
+  border: 1px solid var(--c-panel-edge);
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--c-text-mute);
+}
+.hud-hint b {
+  color: var(--c-text-dim);
+  font-weight: 500;
+}
+
+@media (max-width: 1100px) {
+  .hud-tackle {
+    display: none;
+  }
+  .hud-log {
+    width: 220px;
+  }
+}
+@media (max-width: 720px) {
+  .hud-hint,
+  .hud-log {
+    display: none;
+  }
+  .hud-slot {
+    min-width: 58px;
+    padding: 6px 6px 5px;
+  }
+  .hud-slot__label {
+    font-size: 9px;
+  }
+}

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Русская Рыбалка 4 — браузерный ремейк</title>
+    <meta name="description" content="Фанатский браузерный ремейк Русской Рыбалки 4: реалистичная рыбалка, погода, снасти и трофеи." />
+    <link rel="stylesheet" href="./styles/base.css" />
+    <link rel="stylesheet" href="./styles/loader.css" />
+    <link rel="stylesheet" href="./styles/hud.css" />
+    <link rel="stylesheet" href="./styles/panels.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./vendor/three.module.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="scene"></canvas>
+
+      <!-- Загрузочный экран -->
+      <div id="loader" class="loader">
+        <div class="loader__logo" aria-hidden="true">
+          <canvas id="logo-canvas" width="520" height="200"></canvas>
+        </div>
+        <div class="loader__title">РУССКАЯ РЫБАЛКА 4</div>
+        <div class="loader__subtitle">браузерный ремейк</div>
+        <div class="loader__bar"><div class="loader__bar-fill" id="loader-fill"></div></div>
+        <div class="loader__status" id="loader-status">Подготовка снастей…</div>
+        <button id="btn-start" class="loader__start" hidden>НАЧАТЬ РЫБАЛКУ</button>
+      </div>
+
+      <!-- HUD и панели монтируются сюда модулями src/ui -->
+      <div id="hud-root"></div>
+      <div id="panels-root"></div>
+      <div id="toast-root" class="toast-root"></div>
+
+      <div id="fatal" class="fatal" hidden>
+        <h2>Не удалось запустить игру</h2>
+        <pre id="fatal-text"></pre>
+      </div>
+    </div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

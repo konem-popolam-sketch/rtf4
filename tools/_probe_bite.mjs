@@ -1,0 +1,11 @@
+﻿import { mulberry32 } from "../src/core/rng.js";
+import { evaluateBite } from "../src/sim/bite.js";
+import { FISH } from "../src/data/fish.js";
+import { BAITS } from "../src/data/baits.js";
+const obs = { minKg: 0.05, maxKg: 1.2, depth: 'mid', rarity: 1, seasons: ['spring','summer','autumn','winter'], timeOfDay: { dawn: 1, day: 0.7, dusk: 1, night: 0.3 }, weatherPenalty: { rain: 0.9, wind: 0.8, clear: 1 }, bait: ['cherv','oparysh'], lure: [] };
+const bait = BAITS.find((b) => b.id === 'cherv');
+const r = evaluateBite({ fishTable: [obs], bait, tackle: { sensitivity: 0.7 }, spot: { structure: 'grass' }, weather: { precip: 'none', windMs: 2 }, timeOfDay: 'dawn', season: 'autumn', skillLuring: 3, rng: mulberry32(5) });
+console.log(JSON.stringify(r));
+const r2 = evaluateBite({ fishTable: [obs], bait: { ...bait, id: 'kukuruza' }, tackle: { sensitivity: 0.7 }, spot: { structure: 'grass' }, weather: { precip: 'none', windMs: 2 }, timeOfDay: 'dawn', season: 'autumn', rng: mulberry32(5) });
+console.log(JSON.stringify(r2));
+console.log('fish count', Array.isArray(FISH) ? FISH.length : FISH);

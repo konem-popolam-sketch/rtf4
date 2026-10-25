@@ -1,0 +1,149 @@
+{
+ "accessibility-specialist": {
+  "model": "inherit"
+ },
+ "ai-programmer": {
+  "model": "inherit"
+ },
+ "analytics-engineer": {
+  "model": "inherit"
+ },
+ "art-director": {
+  "model": "inherit"
+ },
+ "audio-director": {
+  "model": "inherit"
+ },
+ "community-manager": {
+  "model": "sonnet"
+ },
+ "creative-director": {
+  "model": "opus"
+ },
+ "devops-engineer": {
+  "model": "sonnet"
+ },
+ "economy-designer": {
+  "model": "inherit"
+ },
+ "engine-programmer": {
+  "model": "inherit"
+ },
+ "game-designer": {
+  "model": "inherit"
+ },
+ "gameplay-programmer": {
+  "model": "inherit"
+ },
+ "godot-csharp-specialist": {
+  "model": "sonnet"
+ },
+ "godot-gdextension-specialist": {
+  "model": "sonnet"
+ },
+ "godot-gdscript-specialist": {
+  "model": "sonnet"
+ },
+ "godot-shader-specialist": {
+  "model": "sonnet"
+ },
+ "godot-specialist": {
+  "model": "inherit"
+ },
+ "lead-programmer": {
+  "model": "sonnet"
+ },
+ "level-designer": {
+  "model": "inherit"
+ },
+ "live-ops-designer": {
+  "model": "inherit"
+ },
+ "localization-lead": {
+  "model": "inherit"
+ },
+ "narrative-director": {
+  "model": "inherit"
+ },
+ "network-programmer": {
+  "model": "inherit"
+ },
+ "performance-analyst": {
+  "model": "inherit"
+ },
+ "producer": {
+  "model": "opus"
+ },
+ "prototyper": {
+  "model": "sonnet"
+ },
+ "qa-lead": {
+  "model": "inherit"
+ },
+ "qa-tester": {
+  "model": "inherit"
+ },
+ "release-manager": {
+  "model": "inherit"
+ },
+ "security-engineer": {
+  "model": "inherit"
+ },
+ "sound-designer": {
+  "model": "inherit"
+ },
+ "systems-designer": {
+  "model": "inherit"
+ },
+ "technical-artist": {
+  "model": "inherit"
+ },
+ "technical-director": {
+  "model": "opus"
+ },
+ "tools-programmer": {
+  "model": "inherit"
+ },
+ "ue-blueprint-specialist": {
+  "model": "sonnet"
+ },
+ "ue-gas-specialist": {
+  "model": "sonnet"
+ },
+ "ue-replication-specialist": {
+  "model": "sonnet"
+ },
+ "ue-umg-specialist": {
+  "model": "sonnet"
+ },
+ "ui-programmer": {
+  "model": "inherit"
+ },
+ "unity-addressables-specialist": {
+  "model": "sonnet"
+ },
+ "unity-dots-specialist": {
+  "model": "sonnet"
+ },
+ "unity-shader-specialist": {
+  "model": "sonnet"
+ },
+ "unity-specialist": {
+  "model": "inherit"
+ },
+ "unity-ui-specialist": {
+  "model": "sonnet"
+ },
+ "unreal-specialist": {
+  "model": "inherit"
+ },
+ "ux-designer": {
+  "model": "inherit"
+ },
+ "world-builder": {
+  "model": "inherit"
+ },
+ "writer": {
+  "model": "inherit"
+ }
+}
