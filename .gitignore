@@ -13,6 +13,12 @@ test-tunnel/
 tools/.gh-token.txt
 tools/cloudflared.exe
 node_modules/
+.tmp-panels/
+.boot.out
+.boot.err
+.scene.out
+.scene.err
+*.log
 
 g-block.txt
 p-block.txt

@@ -11,7 +11,6 @@ import {
   fishName,
   fishPrice,
   lures,
-  TACKLE,
   TACKLE_CATEGORIES,
   ownedTackleIds,
   tackleByCategory,
@@ -37,10 +36,26 @@ function moneyClass(price, money) {
   return price > money ? 'u-bad' : 'u-gold';
 }
 
-function buyButtons(id, disabled, qty = true) {
+function buyButtons(id, price, money, qty = true) {
+  const one = price > money;
+  const five = price * 5 > money;
   return `
-    <button class="btn btn--sm btn--primary" type="button" data-act="buy" data-id="${esc(id)}" data-qty="1" ${disabled}>Купить</button>
-    ${qty ? `<button class="btn btn--sm" type="button" data-act="buy" data-id="${esc(id)}" data-qty="5" ${disabled}>×5</button>` : ''}`;
+    <button class="btn btn--sm btn--primary" type="button" data-act="buy" data-id="${esc(id)}" data-qty="1"${
+      one ? ' disabled' : ''
+    }>Купить</button>
+    ${
+      qty
+        ? `<button class="btn btn--sm" type="button" data-act="buy" data-id="${esc(id)}" data-qty="5"${
+            five ? ' disabled' : ''
+          }>×5</button>`
+        : ''
+    }`;
+}
+
+const DEPTH_NAMES = { bottom: 'со дна', mid: 'в полводы', surface: 'у поверхности' };
+
+function depthChip(depthWork) {
+  return chip(DEPTH_NAMES[depthWork] || 'в полводы');
 }
 
 function baitCard(item, owned, money) {
@@ -57,7 +72,7 @@ function baitCard(item, owned, money) {
       <div class="pn-good__meta">
         ${chip(`крючок ${String(item.hookSize || 'm').toUpperCase()}`)}
         ${chip(`${Number(item.sizeMm) || 0} мм`)}
-        ${chip(`дно: ${esc(item.depthWork || 'mid')}`)}
+        ${depthChip(item.depthWork)}
       </div>
       <div class="pn-good__attr">
         <span>мелкая</span>${bar(attraction.small, 1, 'skill')}
@@ -67,7 +82,7 @@ function baitCard(item, owned, money) {
       ${item.notes ? `<p class="pn-good__note">${esc(item.notes)}</p>` : ''}
       <footer class="pn-good__foot">
         <span class="pn-price ${moneyClass(price, money)}">${rub(price)}</span>
-        ${buyButtons(item.id, poor)}
+        ${buyButtons(item.id, price, money)}
       </footer>
     </article>`;
 }
@@ -85,7 +100,7 @@ function lureCard(item, owned, money) {
       <div class="pn-good__meta">
         ${chip(`крючок ${String(item.hookSize || 'm').toUpperCase()}`)}
         ${chip(`${Number(item.sizeMm) || 0} мм`)}
-        ${chip(`дно: ${esc(item.depthWork || 'mid')}`)}
+        ${depthChip(item.depthWork)}
       </div>
       <div class="pn-good__attr">
         <span>мелкая</span>${bar(item.attraction && item.attraction.small, 1, 'good')}
@@ -95,7 +110,7 @@ function lureCard(item, owned, money) {
       ${item.notes ? `<p class="pn-good__note">${esc(item.notes)}</p>` : ''}
       <footer class="pn-good__foot">
         <span class="pn-price ${moneyClass(price, money)}">${rub(price)}</span>
-        ${buyButtons(item.id, poor, false)}
+        ${buyButtons(item.id, price, money, false)}
       </footer>
     </article>`;
 }
@@ -286,4 +301,3 @@ export function mount(root, ctx) {
   return panel;
 }
 
-export const SHOP_TACKLE_COUNT = Object.keys(TACKLE).length;

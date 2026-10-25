@@ -11,6 +11,20 @@
  * Выход 0 — игра поднялась; 1 — упала (печатается стек).
  */
 
+/* --------------------- резолвер голого `three` для Node ---------------------
+ * В браузере `import * as THREE from 'three'` находит vendor/three.module.js
+ * через importmap в index.html. В Node importmap не существует, поэтому без
+ * этой регистрации смоук падал на первом же импорте сцены и не проверял НИЧЕГО
+ * из того, что идёт после. Регистрируем ровно тот же vendor-файл — тогда смоук
+ * гоняет тот three.js, который реально уедет на сайт.
+ */
+import { register } from 'node:module';
+import { pathToFileURL } from 'node:url';
+
+if (typeof register === 'function') {
+  register('./three-resolver.mjs', pathToFileURL(`${import.meta.dirname}/`));
+}
+
 /* ------------------------------ DOM-заглушки ------------------------------ */
 
 const noop = () => {};

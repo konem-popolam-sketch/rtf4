@@ -8,8 +8,10 @@ import { waterNormalTexture } from '../textures/procedural.js';
 
 const SIZE = 700;
 const SEG = 40;
-/** Вода начинается у линии берега (z ≈ 1) и уходит вдаль до -699. */
-const CENTER_Z = -340;
+/** Вода начинается чуть под песком (z ≈ 0.8) и уходит вдаль. */
+const CENTER_Z = 0.8 - SIZE / 2;
+/** У берега волны гасим, иначе гребни протыкают песок. */
+const SHORE_FADE_M = 14;
 
 export function createWater({ scene, ambient }) {
   const normalMap = waterNormalTexture(THREE, 256);
@@ -48,11 +50,15 @@ export function createWater({ scene, ambient }) {
     const amp = 0.085;
     for (let i = 0; i < arr.length; i += 3) {
       const x = base[i];
-      const z = base[i + 2];
+      const zWorld = base[i + 2] + CENTER_Z;
+      // У берега волну гасим плавно: гребни не должны протыкать песок.
+      const shoreFade = Math.min(1, Math.max(0, -zWorld / SHORE_FADE_M));
+      const a = amp * (0.25 + shoreFade * 0.75);
       arr[i + 1] =
-        Math.sin(x * 0.11 + time * 0.85) * amp +
-        Math.sin(z * 0.14 - time * 0.62) * amp * 0.8 +
-        Math.sin((x + z) * 0.05 + time * 0.41) * amp * 1.2;
+        (Math.sin(x * 0.11 + time * 0.85) +
+          Math.sin(zWorld * 0.14 - time * 0.62) * 0.8 +
+          Math.sin((x + zWorld) * 0.05 + time * 0.41) * 1.2) *
+        a;
     }
     pos.needsUpdate = true;
     normalMap.offset.x = (normalMap.offset.x + dt * 0.014) % 1;
@@ -80,12 +86,16 @@ export function createWater({ scene, ambient }) {
     }
   }
 
-  /** Куда бьёт «вода»: отдаём высоту волны в точке — поплавок качается в такт. */
+  /** Высота волны в мировой точке — поплавок качается в такт с водой. */
   function waveHeightAt(x, z) {
+    const shoreFade = Math.min(1, Math.max(0, -z / SHORE_FADE_M));
+    const a = 0.25 + shoreFade * 0.75;
     return (
-      Math.sin(x * 0.11 + time * 0.85) * 0.085 +
-      Math.sin(z * 0.14 - time * 0.62) * 0.068 +
-      Math.sin((x + z) * 0.05 + time * 0.41) * 0.102
+      (Math.sin(x * 0.11 + time * 0.85) +
+        Math.sin(z * 0.14 - time * 0.62) * 0.8 +
+        Math.sin((x + z) * 0.05 + time * 0.41) * 1.2) *
+      0.085 *
+      a
     );
   }
 

@@ -13,7 +13,6 @@ import { createSheet } from './common.js';
  */
 export function mountPanel(root, ctx, cfg) {
   const { bus } = ctx;
-  root.classList.add('pn-mount');
   root.hidden = true;
   const sheet = createSheet(root, {
     title: cfg.title,
@@ -25,15 +24,19 @@ export function mountPanel(root, ctx, cfg) {
 
   const offs = (cfg.events || ['state:changed']).map((name) => bus.on(name, life.render));
 
+  const onBackdrop = (event) => {
+    if (event.target === root) life.requestClose();
+  };
+
   sheet.onClose(life.requestClose);
-  root.addEventListener('mousedown', life.onBackdrop);
+  root.addEventListener('mousedown', onBackdrop);
 
   return {
     open: life.open,
     close: life.close,
     dispose: () => {
       offs.forEach((off) => off());
-      root.removeEventListener('mousedown', life.onBackdrop);
+      root.removeEventListener('mousedown', onBackdrop);
       life.dispose();
     },
     render: life.render,
@@ -45,7 +48,7 @@ export function mountPanel(root, ctx, cfg) {
 
 /** Жизненный цикл панели: открытие/закрытие, перерисовка, очистка обработчиков. */
 function createLifecycle(root, ctx, cfg, sheet, view) {
-  const { bus } = ctx;
+  const bus = ctx.bus;
   let opened = false;
   let payload = null;
   let cleanup = null;
@@ -60,17 +63,7 @@ function createLifecycle(root, ctx, cfg, sheet, view) {
     cleanup = null;
   };
 
-  const api = () => ({
-    sheet,
-    bus,
-    state: ctx.state,
-    actions: ctx.actions,
-    panel: ctx.panel || cfg.name || '',
-    payload,
-    view,
-    render: render,
-    close: requestClose,
-  });
+  const api = () => makeApi({ sheet, bus, ctx, cfg, payload, view, render, requestClose });
 
   function render() {
     if (!opened) return;
@@ -98,28 +91,44 @@ function createLifecycle(root, ctx, cfg, sheet, view) {
   }
 
   function requestClose() {
-    bus.emit('ui:panel', { name: null });
-    close();
+    closeThroughOwner(ctx, bus, close);
   }
 
-  function onBackdrop(event) {
-    if (event.target === root) requestClose();
+  function dispose() {
+    runCleanup();
+    if (cfg.onDispose) cfg.onDispose();
+    root.innerHTML = '';
+    root.hidden = true;
   }
 
+  return { open, close, render, requestClose, dispose, isOpen: () => opened };
+}
+
+/**
+ * Крестик и подложка просят закрыть панель у владельца (агрегатора), чтобы
+ * стор и пауза синхронизировались. Без владельца закрываемся сами.
+ */
+function closeThroughOwner(ctx, bus, close) {
+  if (typeof ctx.requestClose === 'function') {
+    ctx.requestClose();
+    return;
+  }
+  bus.emit('ui:panel', { name: null });
+  close();
+}
+
+/** Объект, который получает render() каждой панели. */
+function makeApi({ sheet, bus, ctx, cfg, payload, view, render, requestClose }) {
   return {
-    open,
-    close,
+    sheet,
+    bus,
+    state: ctx.state,
+    actions: ctx.actions,
+    panel: ctx.panel || cfg.name || '',
+    payload,
+    view,
     render,
-    requestClose,
-    onBackdrop,
-    dispose() {
-      runCleanup();
-      if (cfg.onDispose) cfg.onDispose();
-      root.innerHTML = '';
-      root.classList.remove('pn-mount');
-      root.hidden = true;
-    },
-    isOpen: () => opened,
+    close: requestClose,
   };
 }
 

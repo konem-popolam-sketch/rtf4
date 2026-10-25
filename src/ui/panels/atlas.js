@@ -249,4 +249,3 @@ export function mount(root, ctx) {
   });
 }
 
-export const ATLAS_FISH_COUNT = fishes.length;

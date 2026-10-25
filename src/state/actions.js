@@ -215,7 +215,14 @@ export function addFish(fishId, kg, cm) {
   const length = Math.max(0, Math.round(Number(cm) || 0));
   const entry = { uid: uid('fish'), fishId, kg: weight, cm: length, ts: Date.now() };
   s.inventory.fish.push(entry);
-  while (s.inventory.fish.length > MAX_FISH) s.inventory.fish.shift();
+  // Садок ограничен. Раньше лишняя рыба молча исчезала из массива; теперь она
+  // «отпускается» с явным сообщением, чтобы игрок видел, куда делся улов.
+  while (s.inventory.fish.length > MAX_FISH) {
+    const released = s.inventory.fish.shift();
+    const name = FISH_BY_ID[released.fishId]?.name || 'Рыба';
+    bus.emit('toast', { text: `Садок полон: ${name} отпущена`, kind: 'info' });
+    addToLog(`Садок полон — ${name} отпущена`);
+  }
   const stats = s.stats;
   stats.catches = (Number(stats.catches) || 0) + 1;
   stats.totalKg = round2((Number(stats.totalKg) || 0) + weight);
@@ -269,6 +276,9 @@ export function setWater(id) {
   const s = st();
   const water = WATER_BY_ID[id];
   if (!s || !water) return false;
+  // Посреди вываживания переезд ломает бой: рыба уже «на крючке» старого
+  // водоёма. Честнее попросить сначала закончить.
+  if (s.ui && s.ui.fighting) { toast('Сначала выведите рыбу', 'bad'); return false; }
   if ((Number(water.unlockLevel) || 1) > s.player.level) {
     toast(`Водоём закрыт: нужен уровень ${water.unlockLevel}`, 'bad'); return false;
   }

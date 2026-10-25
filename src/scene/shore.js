@@ -7,9 +7,10 @@ import * as THREE from 'three';
 import { sandTexture, grassTexture, reedTexture, barkTexture } from '../textures/procedural.js';
 import { seededRnd, toColor } from './util.js';
 
-const BANK_Z = 1;      // линия уреза воды
+const BANK_Z = 1.2;    // линия уреза воды (вода заканчивается здесь)
 const SAND_DEPTH = 7;  // ширина песчаной полосы
 const GRASS_FAR = 120; // докуда тянется трава
+const REED_Z = 1.9;    // камыш стоит на песке у самой воды, не в воде
 
 /** Настроить повтор уже созданной текстуры (clone не берём: shared source при dispose опасен). */
 function tiled(tex, rx, ry) {
@@ -74,8 +75,8 @@ function buildReeds(reedTex) {
   for (let i = 0; i < count; i++) {
     // Две куртины по краям, чтобы середина воды оставалась свободной для заброса.
     const side = i % 2 === 0 ? -1 : 1;
-    // Основание креста — на уровне земли, иначе камыш «висит» в воздухе.
-    pos.set(side * (12 + rnd() * 62), 0.015, 2.6 + rnd() * 4.6);
+    // Камыш — на песке у воды (z > BANK_Z), основание креста на уровне земли.
+    pos.set(side * (10 + rnd() * 46), 0.015, REED_Z + rnd() * 1.5);
     q.setFromAxisAngle(axisY, rnd() * Math.PI);
     const s = 0.72 + rnd() * 0.8;
     scale.set(s, s * (0.85 + rnd() * 0.5), s);

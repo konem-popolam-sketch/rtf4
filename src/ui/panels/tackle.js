@@ -4,7 +4,7 @@
  * Владелец: ui-programmer.
  */
 import { mountPanel, bindDelegated, bindDelegatedInput, clickSfx, equipBait, equipLure, setGear, setRig } from './shell.js';
-import { chip, emptyState, esc, RIG_NAMES } from './common.js';import {
+import { emptyState, esc, RIG_NAMES } from './common.js';import {
   baitOf,
   baits,
   isRodFitsRig,
@@ -309,4 +309,3 @@ export function mount(root, ctx) {
   });
 }
 
-export const TACKLE_BAIT_COUNT = baits.length + lures.length;

@@ -8,7 +8,7 @@ import {
   bar,
   emptyState,
   esc,
-  questClaimed,
+  questAvailable,
   questGoalText,
   questProgress,
   questStatus,
@@ -57,6 +57,7 @@ function questCard(quest, state, expanded) {
     <article class="pn-quest${ready ? ' pn-quest--ready' : ''}${done ? ' pn-quest--done' : ''}">
       <header class="pn-quest__head">
         <b class="pn-quest__title">${esc(quest.title || quest.id)}</b>
+        ${quest.repeatable ? '<span class="pn-badge">повторяемое</span>' : ''}
         <span class="pn-badge ${done ? 'pn-badge--good' : ready ? 'pn-badge--gold' : ''}">
           ${done ? 'получено' : ready ? 'готово' : 'в работе'}
         </span>
@@ -84,6 +85,7 @@ function questCard(quest, state, expanded) {
 function grouped(state) {
   const buckets = { active: [], ready: [], done: [] };
   for (const quest of quests) {
+    if (!questAvailable(state, quest)) continue;
     const status = questStatus(state, quest);
     if (status === 'claimed') buckets.done.push(quest);
     else if (status === 'ready') buckets.ready.push(quest);
@@ -162,5 +164,3 @@ export function mount(root, ctx) {
   });
 }
 
-export const QUESTS_TOTAL = quests.length;
-export { questClaimed };

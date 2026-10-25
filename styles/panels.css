@@ -319,6 +319,24 @@
   font-weight: 500;
   color: var(--c-text-mute);
 }
+.pn-rarity--r0 b {
+  color: var(--c-text-mute);
+}
+.pn-rarity--r1 b {
+  color: color-mix(in srgb, var(--c-text-dim) 65%, var(--c-good));
+}
+.pn-rarity--r2 b {
+  color: var(--c-good);
+}
+.pn-rarity--r3 b {
+  color: var(--c-skill);
+}
+.pn-rarity--r4 b {
+  color: var(--c-accent);
+}
+.pn-rarity--r5 b {
+  color: var(--c-accent-2);
+}
 .pn-stars {
   font-size: 12px;
   letter-spacing: 0.08em;
@@ -396,7 +414,10 @@
   font-size: 12px;
 }
 .pn-table--spots {
-  min-width: 880px;
+  min-width: 780px;
+}
+.pn-table--catch {
+  min-width: 420px;
 }
 .pn-table--atlas {
   min-width: 1020px;
@@ -865,6 +886,11 @@
   );
   border-radius: 60% 40% 45% 55% / 55% 50% 50% 45%;
   box-shadow: inset -6px 0 6px color-mix(in srgb, var(--c-night) 35%, transparent);
+}
+.pn-fishcard__shape--torpedo {
+  width: 38px;
+  height: 13px;
+  border-radius: 55% 45% 40% 60% / 50% 50% 55% 45%;
 }
 .pn-fishcard__shape--flat {
   height: 22px;

@@ -55,6 +55,7 @@ function createRuntime(state, actions) {
   const activeActions = () => (actionsRef && actionsRef.actions) || actionsRef || null;
 
   const mem = {
+    requestClose: null,
     get state() {
       if (stateRef) return stateRef;
       const runtime = globalThis.RTF4;
@@ -89,6 +90,11 @@ function panelContext(bus, runtime, name) {
     get actions() {
       return runtime.actions;
     },
+    /** Закрытие по кнопке/подложке идёт через агрегатор, чтобы синхронизировать стор. */
+    requestClose() {
+      if (typeof runtime.requestClose === 'function') runtime.requestClose();
+      else bus.emit('ui:panel', { name: null });
+    },
   };
 }
 
@@ -103,82 +109,82 @@ function mountAll(host, bus, runtime) {
   return panels;
 }
 
+/** Открыть панель: через стор (чтобы игра ставила паузу) или напрямую через шину. */
+function openPanel(state, name, payload) {
+  const { bus, panels } = state;
+  if (!name || !panels.has(name)) {
+    if (name) bus.emit('toast', { text: 'Такого экрана нет', kind: 'bad' });
+    return;
+  }
+  const entry = panels.get(name);
+  if (name === state.current) {
+    entry.panel.open(payload || {});
+    return;
+  }
+  if (callStore(state, name)) {
+    if (payload) entry.panel.open(payload);
+    return;
+  }
+  bus.emit('ui:panel', { name });
+  applyPanel(state, name);
+}
+
+/** Закрыть активную панель; повторный вызов безопасен. */
+function closePanel(state) {
+  if (!state.current) return;
+  if (callStore(state, null)) return;
+  state.bus.emit('ui:panel', { name: null });
+  applyPanel(state, null);
+}
+
+/** Переключить видимую панель: закрыть предыдущую, открыть следующую. */
+function applyPanel(state, name) {
+  if (state.disposed) return;
+  const next = name && state.panels.has(name) ? name : null;
+  if (next === state.current) return;
+  if (state.current) {
+    const prev = state.panels.get(state.current);
+    if (prev) prev.panel.close();
+  }
+  state.current = next;
+  if (next) state.panels.get(next).panel.open({ source: 'aggregator' });
+}
+
+/** Запись через actions.setPanel: так панель ставит игру на паузу. */
+function callStore(state, name) {
+  const actions = state.runtime.actions;
+  const store = state.runtime.state;
+  if (!actions || typeof actions.setPanel !== 'function' || !store || !store.ui) return false;
+  actions.setPanel(name);
+  return true;
+}
+
 /** Переключение видимой панели: закрыть предыдущую, открыть следующую. */
 function createSwitcher(bus, runtime, panels) {
-  let current = null;
-  let disposed = false;
-
-  const apply = (name) => {
-    if (disposed) return;
-    const next = name && panels.has(name) ? name : null;
-    if (next === current) return;
-    if (current) {
-      const prev = panels.get(current);
-      if (prev) prev.panel.close();
-    }
-    current = next;
-    if (next) panels.get(next).panel.open({ source: 'aggregator' });
-  };
-
-  /** Закрытие через стор, чтобы игра сняла паузу; иначе эмитим событие сами. */
-  const viaStore = (name) => {
-    const actions = runtime.actions;
-    const store = runtime.state;
-    if (!actions || typeof actions.setPanel !== 'function' || !store || !store.ui) return false;
-    actions.setPanel(name);
-    return true;
-  };
-
-  const open = (name, payload) => {
-    if (!name || !panels.has(name)) {
-      if (name) bus.emit('toast', { text: 'Такого экрана нет', kind: 'bad' });
-      return;
-    }
-    const entry = panels.get(name);
-    if (name === current) {
-      entry.panel.open(payload || {});
-      return;
-    }
-    if (viaStore(name)) {
-      if (payload) entry.panel.open(payload);
-      return;
-    }
-    bus.emit('ui:panel', { name });
-    apply(name);
-  };
-
-  const close = () => {
-    if (!current) return;
-    if (viaStore(null)) return;
-    bus.emit('ui:panel', { name: null });
-    apply(null);
-  };
+  const state = { bus, runtime, panels, current: null, disposed: false };
 
   const refresh = () => {
-    if (!current) return;
-    const entry = panels.get(current);
+    if (!state.current) return;
+    const entry = state.panels.get(state.current);
     if (entry) entry.panel.render();
   };
 
   const onPanelEvent = (payload) => {
     const name = payload && typeof payload === 'object' ? payload.name : payload;
-    apply(name || null);
+    applyPanel(state, name || null);
   };
 
   return {
-    open,
-    close,
+    open: (name, payload) => openPanel(state, name, payload),
+    close: () => closePanel(state),
     refresh,
-    apply,
+    apply: (name) => applyPanel(state, name),
     onPanelEvent,
-    toggle: (name) => (current === name ? close() : open(name)),
-    isOpen: () => current,
-    reset() {
-      current = null;
-    },
+    toggle: (name) => (state.current === name ? closePanel(state) : openPanel(state, name)),
+    isOpen: () => state.current,
     dispose() {
-      disposed = true;
-      current = null;
+      state.disposed = true;
+      state.current = null;
     },
   };
 }
@@ -232,6 +238,10 @@ export function initPanels({ bus, state, actions, root } = {}) {
   const savedPanel = runtime.state && runtime.state.ui && runtime.state.ui.panel;
   if (savedPanel && panels.has(savedPanel)) switcher.apply(savedPanel);
 
+  // Крестик панели и клик по подложке закрывают её через агрегатор.
+  runtime.requestClose = () => switcher.close();
+
+  // Связываем шину с паузой игры: close() идёт через стор, но страховка не помешает.
   loadStoreFallback(runtime, switcher.refresh);
 
   return {
@@ -246,6 +256,7 @@ export function initPanels({ bus, state, actions, root } = {}) {
     dispose() {
       offPanel();
       offEscape();
+      runtime.requestClose = null;
       for (const entry of panels.values()) entry.panel.dispose();
       panels.clear();
       switcher.dispose();

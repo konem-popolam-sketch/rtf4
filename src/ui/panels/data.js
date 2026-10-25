@@ -9,7 +9,6 @@ import { LURES } from '../../data/lures.js';
 import { TACKLE_BY_ID } from '../../data/tackle.js';
 import { WATERS } from '../../data/spots.js';
 import { QUESTS } from '../../data/quests.js';
-import { fmtKg } from '../../core/util.js';
 
 const asList = (value) => (Array.isArray(value) ? value.filter((item) => item && item.id) : []);
 const asMap = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
@@ -68,21 +67,11 @@ export function tackleOf(id) {
   return TACKLE[id] || null;
 }
 
-export function tackleName(id) {
-  const item = tackleOf(id);
-  return item ? item.name || id : '—';
-}
-
 /** Цена рыбы за конкретный вес; если в записи садка уже есть price — берём его. */
 export function fishPrice(fishId, weightKg, explicitPrice) {
   if (Number.isFinite(Number(explicitPrice)) && Number(explicitPrice) > 0) return Math.round(Number(explicitPrice));
   const fish = fishOf(fishId);
   return Math.max(0, Math.round((Number(fish.pricePerKg) || 0) * (Number(weightKg) || 0)));
-}
-
-export function fishLabel(fishId, weightKg) {
-  if (weightKg == null || !Number.isFinite(Number(weightKg))) return fishName(fishId);
-  return `${fishName(fishId)} · ${fmtKg(weightKg)}`;
 }
 
 const CATEGORY_PREFIXES = [
@@ -161,19 +150,8 @@ export function waterOf(id) {
   return waters.find((w) => w.id === id) || null;
 }
 
-export function waterName(id) {
-  const water = waterOf(id);
-  return water ? water.name : 'Водоём';
-}
-
 export function spotOf(waterId, spotId) {
   const water = waterOf(waterId);
   const spots = water && Array.isArray(water.spots) ? water.spots : [];
   return spots.find((s) => s.id === spotId) || null;
 }
-
-export function questsList() {
-  return quests.slice();
-}
-
-export const WATER_BY_ID = Object.fromEntries(waters.map((w) => [w.id, w]));

@@ -3,11 +3,10 @@
  * подписки на шину и «терпимое» чтение состояния (поля могут появиться позже).
  * Владелец: ui-programmer.
  */
-import { clamp, fmtInt, fmtKg, fmtMoney, round1 } from '../../core/util.js';
+import { clamp, fmtInt, fmtKg, round1 } from '../../core/util.js';
 
 export const RARITY_NAMES = ['Обычная', 'Нечастая', 'Редкая', 'Очень редкая', 'Эпическая', 'Легендарная'];
 export const RARITY_STARS = ['☆☆☆☆☆', '★☆☆☆☆', '★★☆☆☆', '★★★☆☆', '★★★★☆', '★★★★★'];
-export const SEASON_NAMES = { spring: 'Весна', summer: 'Лето', autumn: 'Осень', winter: 'Зима' };
 export const TIME_NAMES = { dawn: 'Рассвет', day: 'День', dusk: 'Закат', night: 'Ночь' };
 export const WATER_TYPE_NAMES = { river: 'Река', lake: 'Озеро', pond: 'Пруд', sea: 'Море' };
 export const STRUCTURE_NAMES = {
@@ -53,22 +52,6 @@ export function firstNumber(...values) {
 
 export function pct(value, max) {
   return max > 0 ? clamp((num(value) / num(max)) * 100, 0, 100) : 0;
-}
-
-export function fmtPercent01(value) {
-  return `${Math.round(clamp(num(value), 0, 1) * 100)} %`;
-}
-
-export function money(v) {
-  return fmtMoney(num(v));
-}
-
-export function kg(v) {
-  return fmtKg(num(v));
-}
-
-export function price(v) {
-  return fmtMoney(Math.max(0, Math.round(num(v))));
 }
 
 /** «N ₽» без слова «деньги» — для строк таблиц. */
@@ -137,32 +120,6 @@ export function createSheet(root, { title, subtitle = '', className = '' } = {})
   };
 }
 
-export function subscribeAll(bus, events, fn) {
-  const offs = events.map((name) => bus.on(name, fn));
-  return () => offs.forEach((off) => off());
-}
-
-export function findAction(actions, names) {
-  if (!actions) return null;
-  for (const name of names) {
-    if (typeof actions[name] === 'function') return actions[name].bind(actions);
-  }
-  return null;
-}
-
-/**
- * Выполнить действие с понятной деградацией: если действия нет — тост, стор не трогаем.
- * Возвращает true, если действие было вызвано.
- */
-export function runAction(actions, names, bus, ...args) {
-  const fn = findAction(actions, names);
-  if (!fn) {
-    if (bus) bus.emit('toast', { text: 'Действие пока недоступно', kind: 'bad' });
-    return false;
-  }
-  fn(...args);
-  return true;
-}
 
 /** Карта «сколько раз поймана рыба»: поддерживаем несколько возможных полей состояния. */
 export function fishCaughtMap(state) {
@@ -237,6 +194,8 @@ function includesId(list, id) {
 }
 
 export function questClaimed(state, quest) {
+  // Повторяемое задание можно закрывать снова, как только накопится новый прогресс.
+  if (quest && quest.repeatable) return false;
   const q = (state && state.quests) || {};
   const rec = questRecord(state, quest.id) || {};
   if (rec.claimed === true || rec.status === 'claimed' || rec.done === 'claimed') return true;
@@ -244,6 +203,16 @@ export function questClaimed(state, quest) {
     return true;
   }
   return false;
+}
+
+/** Задание доступно игроку: есть в activeIds, либо уже начато/закрыто. */
+export function questAvailable(state, quest) {
+  const q = (state && state.quests) || {};
+  const active = q.activeIds;
+  if (!Array.isArray(active) || active.length === 0) return true;
+  if (active.includes(quest.id)) return true;
+  const progress = (q.progress && Number(q.progress[quest.id])) || 0;
+  return progress > 0 || questClaimed(state, quest);
 }
 
 export function questStatus(state, quest) {
@@ -265,7 +234,7 @@ export function questGoalText(goal, fishLabel) {
     case 'catchFish': {
       const minKg = num(goal.minKg, 0);
       const name = fishLabel || 'рыбу';
-      return minKg > 0 ? `Поймать ${name} от ${kg(minKg)}` : `Поймать ${name}`;
+      return minKg > 0 ? `Поймать ${name} от ${fmtKg(minKg)}` : `Поймать ${name}`;
     }
     default:
       return 'Особое задание';
@@ -283,5 +252,3 @@ export function keepFocus(input, wasFocused) {
     /* поле могло не поддерживать выделение */
   }
 }
-
-export const closeIcon = '✕';

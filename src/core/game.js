@@ -82,6 +82,10 @@ export function createGame({ state, renderer, bus: b }) {
   function setPhase(next) {
     if (game.phase === next) return;
     game.phase = next;
+    // Флаги для панелей и смены водоёма: во время вываживания переезд запрещён,
+    // иначе состояние боя остаётся от старого водоёма, а картинка уже новая.
+    state.ui.casting = next === 'cast' || next === 'wait';
+    state.ui.fighting = next === 'fight' || next === 'bite';
     game.scene?.setPhase?.(next);
     events.emit('phase:changed', { phase: next });
   }
@@ -148,14 +152,21 @@ export function createGame({ state, renderer, bus: b }) {
       bobberT: 0,
     };
     setPhase('cast');
+    // Новый заброс поверх только что пойманной рыбы: баннер трофея и его таймер
+    // принадлежат прошлому забросу и не должны висеть над новым.
+    game.catchInfo = null;
+    game.landedTimer = 0;
     game.scene?.castTo?.(res.distM);
     sfx('cast');
     state.stats.casts += 1;
     markChanged();
     // Переход в ожидание — после анимации полёта.
+    // Токен поколения: если игрок отменил заброс и сразу забросил снова, старый
+    // таймер не должен переводить НОВЫЙ полёт в «ожидание» раньше времени.
     const flight = clamp(res.distM / 26, 0.45, 1.4);
+    const seq = (game.castSeq = (game.castSeq || 0) + 1);
     setTimeout(() => {
-      if (game.phase !== 'cast') return;
+      if (seq !== game.castSeq || game.phase !== 'cast') return;
       beginWaiting();
     }, flight * 1000);
     return true;
@@ -282,6 +293,9 @@ export function createGame({ state, renderer, bus: b }) {
     game.cast = null;
     game.fish = null;
     game.pendingKg = 0;
+    // Рыба, которую ждали, больше не ждётся: иначе поле висит с прошлого раза и
+    // любой новый код, прочитавший его до beginWaiting, поймает чужой вид.
+    game.pendingFish = null;
     saveState(state);
   }
 
@@ -320,9 +334,16 @@ export function createGame({ state, renderer, bus: b }) {
 
     // Таймеры фаз.
     if (game.phase === 'wait') {
-      game.cast.bobberT = (game.cast.bobberT || 0) + dt;
-      game.biteTimer -= dt * scale * 0.35;
-      if (game.biteTimer <= 0) triggerBite();
+      if (!game.cast) {
+        // Поплавка нет — ждать нечего. Раньше здесь падал каждый кадр, кадр
+        // глушился try/catch и игра «замирала» с живым HUD.
+        setPhase('idle');
+        game.biteTimer = 0;
+      } else {
+        game.cast.bobberT = (game.cast.bobberT || 0) + dt;
+        game.biteTimer -= dt * scale * 0.35;
+        if (game.biteTimer <= 0) triggerBite();
+      }
     } else if (game.phase === 'bite') {
       game.biteWindow -= dt;
       game.scene?.setBite?.(game.biteStrength * clamp(game.biteWindow / BITE_WINDOW, 0.2, 1));
@@ -428,6 +449,11 @@ export function wireGame(game) {
   bus.on('action:reel', (p) => game.actionReel?.(p?.value));
   bus.on('action:rodUp', (p) => game.actionRodUp?.(p?.up));
   bus.on('action:cancel', () => game.actionCancel?.());
+  // Смена водоёма во время заброса: снасть в воде старого водоёма — сматываем,
+  // иначе поплавок висит над водой, где его никто не забрасывал.
+  bus.on('world:changed', () => {
+    if (game.phase === 'cast' || game.phase === 'wait' || game.phase === 'bite') actionCancel();
+  });
   bus.on('ui:panel', (p) => game.setPaused?.(Boolean(p?.name)));
   return game;
 }
