@@ -8,7 +8,10 @@
     "start": "node tools/serve.cjs 8080 .",
     "dev": "node tools/serve.cjs 8080 .",
     "check": "node tools/check-all.mjs",
-    "test": "node tools/selftest.mjs"
+    "test": "node tools/selftest.mjs",
+    "smoke": "node tools/boot-smoke.mjs",
+    "scene": "node tools/smoke-scene.mjs",
+    "live": "node tools/live-check.mjs"
   },
   "engines": {
     "node": ">=18"

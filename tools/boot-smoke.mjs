@@ -1,4 +1,4 @@
-﻿/**
+/**
  * boot-smoke.mjs — запуск игры в Node без браузера.
  *
  * Зачем: в этой песочнице нельзя запустить ни headless Chrome, ни puppeteer
@@ -740,6 +740,16 @@ async function main() {
     if (!renderer || typeof renderer.update !== 'function') problems.push('renderer без update()');
     if (!game || typeof game.start !== 'function') problems.push('game без start()');
     else {
+      // Старт — как у игрока: кнопкой на загрузочном экране, а не вызовом start().
+      const startBtn = documentStub.getElementById('btn-start');
+      if (startBtn && typeof startBtn.click === 'function') {
+        try {
+          startBtn.click();
+        } catch (err) {
+          reportError('клик «Начать рыбалку»', err);
+        }
+      }
+      if (!game.started) problems.push('кнопка «Начать рыбалку» не запустила игру');
       try {
         game.start();
       } catch (err) {
