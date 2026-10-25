@@ -191,13 +191,11 @@ export function buyGood(actions, bus, kind, id, qty = 1) {
   const names = BUY_NAMES[kind] || ['buyItem'];
   for (const name of names) {
     if (actions && typeof actions[name] === 'function') {
-      actions[name](id, qty);
-      return true;
+      return actions[name](id, qty) !== false;
     }
   }
   if (actions && typeof actions.buyItem === 'function') {
-    actions.buyItem(id, qty, kind);
-    return true;
+    return actions.buyItem(id, qty, kind) !== false;
   }
   toast(bus, 'Покупка пока недоступна', 'bad');
   return false;

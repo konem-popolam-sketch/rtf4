@@ -139,19 +139,29 @@ function sinkRateM(sinkerWeightG, feederWeightG) {
  * Берег — (0, 8), направление — на выбранную точку spot, дальность — по характеристикам снасти.
  * Итоговая глубина считается по spot.depthM: недолёт до точки означает меньшую глубину.
  */
+/** Геометрия заброса: направление от берега к цели и дистанция до неё. */
+function aimAt(spot) {
+  const dx = num(spot?.x, 0) - SHORE_POINT.x;
+  const dz = num(spot?.z, -20) - SHORE_POINT.z;
+  const targetDist = Math.max(0.001, Math.hypot(dx, dz));
+  return {
+    targetDist,
+    castDirDeg: Math.atan2(dx, dz) / DEG,
+    ux: dx / targetDist,
+    uz: dz / targetDist,
+    spotDepth: Math.max(0.3, num(spot?.depthM, 3)),
+  };
+}
+
+/**
+ * Полный заброс: от силы замаха до точки в мировых координатах.
+ * Берег — (0, 8), направление — на выбранную точку spot, дальность — по характеристикам снасти.
+ * Итоговая глубина считается по spot.depthM: недолёт до точки означает меньшую глубину.
+ */
 export function applyCast({ spot, stats, power01, skillCasting, weather, rng }) {
   const random = typeof rng === 'function' ? rng : Math.random;
   const s = stats || {};
-  const target = spot || {};
-  const tx = num(target.x, 0);
-  const tz = num(target.z, -20);
-  const spotDepth = Math.max(0.3, num(target.depthM, 3));
-
-  // Направление заброса: от берега к точке.
-  const dx = tx - SHORE_POINT.x;
-  const dz = tz - SHORE_POINT.z;
-  const targetDist = Math.max(0.001, Math.hypot(dx, dz));
-  const castDirDeg = Math.atan2(dx, dz) / DEG;
+  const aim = aimAt(spot);
 
   const windMs = Math.max(0, num(weather?.windMs, 0));
   const windDirDeg = num(weather?.windDirDeg, 0);
@@ -161,27 +171,23 @@ export function applyCast({ spot, stats, power01, skillCasting, weather, rng }) 
     power01,
     windMs,
     windDirDeg,
-    castDirDeg,
+    castDirDeg: aim.castDirDeg,
     skillCasting,
     sinkerWeightG: s.sinkerWeightG,
   });
 
   const accuracy = castAccuracy({ distM: cast.distM, power01, skillCasting, windMs });
 
-  // Точка падения: вдоль направления заброса, затем случайный разброс по углу.
-  const ux = dx / targetDist;
-  const uz = dz / targetDist;
+  // Точка падения: вдоль направления заброса плюс случайный разброс по углу.
+  // sqrt(random()) даёт равномерное заполнение круга, а не сгусток в центре.
   const angle = random() * Math.PI * 2;
   const radius = accuracy.spreadM * Math.sqrt(random());
-  const offsetX = Math.cos(angle) * radius;
-  const offsetZ = Math.sin(angle) * radius;
-
-  const x = SHORE_POINT.x + ux * cast.distM + offsetX;
-  const z = SHORE_POINT.z + uz * cast.distM + offsetZ;
+  const x = SHORE_POINT.x + aim.ux * cast.distM + Math.cos(angle) * radius;
+  const z = SHORE_POINT.z + aim.uz * cast.distM + Math.sin(angle) * radius;
 
   // Недолёт до выбранной точки = мельче: глубина растёт по мере приближения к точке.
-  const reached = clamp(Math.hypot(x - SHORE_POINT.x, z - SHORE_POINT.z) / targetDist, 0.1, 1);
-  const waterDepthM = Math.max(0.3, spotDepth * reached);
+  const reached = clamp(Math.hypot(x - SHORE_POINT.x, z - SHORE_POINT.z) / aim.targetDist, 0.1, 1);
+  const waterDepthM = Math.max(0.3, aim.spotDepth * reached);
 
   const minutesToSettle = clamp(
     waterDepthM / sinkRateM(s.sinkerWeightG, s.feederWeightG) + 0.5 + cast.distM * 0.01,
@@ -199,7 +205,7 @@ export function applyCast({ spot, stats, power01, skillCasting, weather, rng }) 
     overshoot: cast.overshoot,
     waterDepthM,
     minutesToSettle,
-    castDirDeg,
-    targetDist,
+    castDirDeg: aim.castDirDeg,
+    targetDist: aim.targetDist,
   };
 }

@@ -253,16 +253,24 @@ export function mount(root, ctx) {
         },
         buy(target) {
           clickSfx(api.bus);
-          const card = target.closest('.pn-good');
-          const name = card && card.querySelector('.pn-good__name');
-          const id = card && card.dataset.id;
+          const id = target.dataset.id;
           if (!id) return;
-          buyGood(api.actions, api.bus, tab === 'lures' ? 'lure' : 'bait', id, Number(target.dataset.qty) || 1);
-          if (name) api.bus.emit('toast', { text: `Куплено: ${name.textContent}`, kind: 'good' });
+          const card = target.closest('.pn-good');
+          const nameEl = card && card.querySelector('.pn-good__name');
+          const qty = Number(target.dataset.qty) || 1;
+          const ok = buyGood(api.actions, api.bus, tab === 'lures' ? 'lure' : 'bait', id, qty);
+          if (ok && nameEl) {
+            api.bus.emit('toast', { text: `Куплено: ${nameEl.textContent}${qty > 1 ? ` ×${qty}` : ''}`, kind: 'good' });
+          }
         },
         'buy-tackle'(target) {
           clickSfx(api.bus);
-          buyGood(api.actions, api.bus, 'tackle', target.dataset.id, 1);
+          const ok = buyGood(api.actions, api.bus, 'tackle', target.dataset.id, 1);
+          if (ok) {
+            const row = target.closest('tr');
+            const nameEl = row && row.querySelector('.pn-cell-main b');
+            if (nameEl) api.bus.emit('toast', { text: `Куплено: ${nameEl.textContent}`, kind: 'good' });
+          }
         },
         sell(target) {
           clickSfx(api.bus);

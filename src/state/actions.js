@@ -102,20 +102,15 @@ export function addLure(id) {
   invChanged();
   markChanged();
   return lureUid;
-}
-/** Элемент оснастки существует, куплен и доступен по уровню. */
+}/** Элемент оснастки существует, куплен и доступен по уровню. */
 function checkOwned(id) {
   const s = st();
   const item = TACKLE_BY_ID[id];
   if (!item) { toast('Такой снасти нет в каталоге', 'bad'); return false; }
   if (!s.inventory.tackleOwned.includes(id)) { toast('Этой снасти нет в рюкзаке', 'bad'); return false; }
-  if ((Number(item.level) || 1) > s.player.level) {
-    toast('Этот товар вам пока не по зубам', 'bad');
-    return false;
-  }
+  if ((Number(item.level) || 1) > s.player.level) { toast('Этот товар вам пока не по зубам', 'bad'); return false; }
   return true;
-}
-/** Смена оснастки: проверка владения, уровня и взаимоисключения наживки/приманки. */
+}/** Смена оснастки: проверка владения, уровня и взаимоисключения наживки/приманки. */
 export function setTackle(patch) {
   const s = st();
   if (!s || !patch || typeof patch !== 'object') return false;
@@ -137,13 +132,13 @@ export function setTackle(patch) {
   if ('lureId' in patch && patch.lureId !== null && !LURE_BY_ID[patch.lureId]) {
     toast('Такой приманки нет', 'bad');
     return false;
-  }
-  // Применяем атомарно, только после всех проверок.
+  }  // Применяем атомарно, только после всех проверок.
   Object.assign(s.tackle, next);
   if ('baitId' in patch) s.tackle.baitId = patch.baitId || null;
   if ('lureId' in patch) s.tackle.lureId = patch.lureId || null;
-  if (s.tackle.baitId) s.tackle.lureId = null;
-  if (s.tackle.lureId) s.tackle.baitId = null;
+  // Непустое значение вытесняет соседнее; явный null соседа не трогает.
+  if ('baitId' in patch && patch.baitId) s.tackle.lureId = null;
+  if ('lureId' in patch && patch.lureId) s.tackle.baitId = null;
   markChanged();
   invChanged();
   return true;
@@ -278,8 +273,7 @@ export function setWater(id) {
   const water = WATER_BY_ID[id];
   if (!s || !water) return false;
   if ((Number(water.unlockLevel) || 1) > s.player.level) {
-    toast(`Водоём закрыт: нужен уровень ${water.unlockLevel}`, 'bad');
-    return false;
+    toast(`Водоём закрыт: нужен уровень ${water.unlockLevel}`, 'bad'); return false;
   }
   const cost = s.world.waterId === id ? 0 : Number(water.travelCost) || 0;
   if (cost > 0 && !spend(cost)) return false;
@@ -313,17 +307,13 @@ export function buyItem(id, qty = 1) {
   // Снасть хранится без количества, поэтому покупается всегда один экземпляр.
   const count = bait || lure ? n : 1;
   if (!bait && !lure && (Number(item.level) || 1) > s.player.level) {
-    toast('Этот товар вам пока не по зубам', 'bad');
-    return false;
+    toast('Этот товар вам пока не по зубам', 'bad'); return false;
   }
   const price = round2(item.price * count);
   if (s.player.money < price) { toast('Недостаточно денег', 'bad'); return false; }
   addMoney(-price, 'buy');
   if (bait) { addBait(id, count); return true; }
-  if (lure) {
-    for (let i = 0; i < count; i += 1) addLure(id);
-    return true;
-  }
+  if (lure) { for (let i = 0; i < count; i += 1) addLure(id); return true; }
   if (!s.inventory.tackleOwned.includes(id)) s.inventory.tackleOwned.push(id);
   invChanged();
   markChanged();
@@ -387,12 +377,14 @@ export function tickPlayTime(dtSec) {
   const s = st();
   const dt = Number(dtSec) || 0;
   if (!s || dt <= 0) return;
-  s.stats.playMinutes = (Number(s.stats.playMinutes) || 0) + dt / 60;
-  const bucket = Math.floor(s.stats.playMinutes / 30);
-  if (drainBucket === null || bucket < drainBucket) drainBucket = bucket;
-  if (bucket > drainBucket) {
-    const steps = bucket - drainBucket;
-    drainBucket = bucket;
+  const before = Number(s.stats.playMinutes) || 0;
+  s.stats.playMinutes = before + dt / 60;
+  const from = Math.floor(before / 30);
+  const to = Math.floor(s.stats.playMinutes / 30);
+  if (drainBucket === null || to < drainBucket) drainBucket = from;
+  if (to > drainBucket) {
+    const steps = to - drainBucket;
+    drainBucket = to;
     s.player.satiety = Math.max(0, round2((Number(s.player.satiety) || 0) - steps));
     s.player.energy = Math.max(0, round2((Number(s.player.energy) || 0) - steps * 0.5));
     tickAccumSec = 0;

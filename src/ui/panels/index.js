@@ -192,7 +192,7 @@ export function initPanels({ bus, state, actions, root } = {}) {
       .then(([gameMod, actionsMod]) => {
         if (disposed) return;
         if (!stateRef && gameMod && typeof gameMod.getState === 'function') stateRef = gameMod.getState();
-        if (!actionsRef && actionsMod) actionsRef = actionsMod.default || actionsMod;
+        if (!actionsRef && actionsMod) actionsRef = actionsMod.actions || actionsMod.default || actionsMod;
         if (current) refresh();
       })
       .catch(() => {
