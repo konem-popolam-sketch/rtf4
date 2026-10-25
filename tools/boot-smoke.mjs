@@ -1,4 +1,4 @@
-/**
+﻿/**
  * boot-smoke.mjs — запуск игры в Node без браузера.
  *
  * Зачем: в этой песочнице нельзя запустить ни headless Chrome, ни puppeteer
@@ -776,6 +776,53 @@ async function main() {
       pumpFrames(60);
       observe();
       console.log(`   фазы за прогон: ${[...seen].join(' → ')}`);
+
+      // Полный цикл улова: поклёвка → подсечка → вываживание → садок.
+      // Кадры приходится раздвигать по-настоящему по времени: update() берёт dt
+      // из performance.now(), и без паузы весь бой уложился бы в 0 секунд.
+      const busy = (ms) => {
+        const until = performance.now() + ms;
+        while (performance.now() < until) { /* ждём кадр */ }
+      };
+      try {
+        game.biteTimer = 0;
+        pumpFrames(2);
+        if (game.phase !== 'bite') problems.push(`поклёвка не наступила (фаза ${game.phase})`);
+        game.actionStrike?.();
+        pumpFrames(2);
+        if (game.phase !== 'fight') problems.push(`подсечка не начала вываживание (фаза ${game.phase})`);
+        const catchesBefore = Number(state.stats.catches) || 0;
+        const fishBefore = state.inventory.fish.length;
+        let endStatus = '—';
+        let maxTension = 0;
+        const { bus } = globalThis.RTF4;
+        bus?.on?.('fight:end', (e) => {
+          endStatus = e?.status || '—';
+        });
+        let frames = 0;
+        while (game.phase === 'fight' && frames < 5000) {
+          // Так играет человек: тянет, пока натяжение в безопасной середине, и
+          // отпускает, когда леска вот-вот лопнет.
+          const tension = Number(game.fight?.tension) || 0;
+          game.actionReel?.(tension < 0.6 ? 0.9 : 0.0);
+          busy(9);
+          pumpFrames(1);
+          if (game.fight) maxTension = Math.max(maxTension, Number(game.fight.tension) || 0);
+          frames += 1;
+        }
+        const landed = (Number(state.stats.catches) || 0) > catchesBefore;
+        const inShed = state.inventory.fish.length > fishBefore;
+        if (!landed || !inShed) {
+          problems.push(
+            `вываживание не довело рыбу до садка (фаза ${game.phase}, кадров ${frames}, ` +
+            `итог ${endStatus}, максимум натяжения ${maxTension.toFixed(2)}, дистанция ${(Number(game.fight?.distM) || 0).toFixed(1)} м)`,
+          );
+        } else {
+          const last = state.inventory.fish[state.inventory.fish.length - 1]; console.log(`   улов: ${last ? last.fishId + " " + last.kg + " кг/" + last.cm + " см" : "?"} за ${frames} кадров (~${(frames * 9 / 1000).toFixed(0)} с боя)`);
+        }
+      } catch (err) {
+        reportError('полный цикл улова', err);
+      }
     }
     console.log(`   fallback-рендер: ${renderer && renderer.isFallback ? 'да (WebGL нет)' : 'нет'}`);
   }
@@ -795,3 +842,5 @@ main().catch((err) => {
   realError('boot-smoke упал до старта:', err);
   process.exit(1);
 });
+
+

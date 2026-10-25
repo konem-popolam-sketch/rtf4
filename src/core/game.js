@@ -227,7 +227,13 @@ export function createGame({ state, renderer, bus: b }) {
     setPhase('fight');
     game.scene?.setBite?.(0);
     const stats = tackleStats();
-    game.fight = createFight({ fish: { ...game.fish, kg: game.pendingKg }, tackle: stats, rng: Math.random });
+    game.fight = createFight({
+      fish: { ...game.fish, kg: game.pendingKg },
+      tackle: stats,
+      rng: Math.random,
+      // Рыба стоит там, где был поплавок: короткий заброс — короткое вываживание.
+      distM: game.cast?.distM,
+    });
     game.fight.fishKg = game.pendingKg;
     sfx('strike');
     toast('Подсечка!', 'good');

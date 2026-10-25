@@ -29,7 +29,7 @@ function resolveTackle(tackle) {
   };
 }
 
-export function createFight({ fish, tackle, rng }) {
+export function createFight({ fish, tackle, rng, distM }) {
   const random = typeof rng === 'function' ? rng : Math.random;
   const t = resolveTackle(tackle);
   const kg = clamp(Number(fish?.kg) || 0.5, 0.02, 200);
@@ -37,11 +37,22 @@ export function createFight({ fish, tackle, rng }) {
   const stamina = clamp(Number(fish?.stamina) || 0.4, 0, 1);
   const aggro = clamp(Number(fish?.aggro) || 0.4, 0, 1);
 
-  // Стартовая дистанция: чем дальше заброс, тем дальше рыба.
-  const startDist = clamp(MIN_DIST + 8 + random() * 18, MIN_DIST + 1, MAX_DIST - 5);
+  // Стартовая дистанция: рыба там, где стоял поплавок. Если заброс не передан
+  // (например, в тестах), берём разумную случайную.
+  const castDist = Number(distM);
+  const startDist = Number.isFinite(castDist) && castDist > 0
+    ? clamp(castDist, MIN_DIST + 1, MAX_DIST - 5)
+    : clamp(MIN_DIST + 8 + random() * 18, MIN_DIST + 1, MAX_DIST - 5);
 
   // Прочность лески в «единицах рыбы»: во сколько раз рыба тяжелее теста — решает исход.
   const loadRatio = t.lineTestKg / Math.max(0.05, kg);
+
+  // Скорость подмотки. Мелкую рыбу просто протаскивают по воде: чем сильнее
+  // снасть превосходит рыбу, тем быстрее она идёт к берегу. Трофей, наоборот,
+  // приходится выкачивать помедленнее и с подъёмом удилища.
+  const overpower = clamp(loadRatio, 0.45, 3.2);
+  const lightFish = kg <= 0.25 ? 1.45 : 1;
+  const reelRate = (0.9 + t.reelSpeed * 0.9 + t.rodPower * 0.5) * overpower * lightFish;
 
   return {
     status: 'fighting',
@@ -51,8 +62,7 @@ export function createFight({ fish, tackle, rng }) {
     fishPower: fightPower,
     fishKg: kg,
     aggro,
-    // Скорость подмотки: сила удилища + скорость катушки, ослабленная тяжёлой рыбой.
-    reelRate: (0.55 + t.reelSpeed * 0.75 + t.rodPower * 0.35) * clamp(loadRatio, 0.35, 2.2),
+    reelRate,
     loadRatio,
     drag: clamp(t.maxDragKg / Math.max(0.1, t.lineTestKg), 0.3, 2),
     hookHold: clamp(0.55 + t.hookStrength * 0.5, 0.4, 1.05),
