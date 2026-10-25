@@ -237,7 +237,7 @@ export function bindDelegated(container, handlers) {
 export function bindDelegatedInput(container, handler) {
   const onInput = (event) => {
     const target = event.target;
-    if (!(target instanceof HTMLElement) || !target.dataset.act) return;
+    if (!target || !target.dataset || !target.dataset.act) return;
     handler(target, event);
   };
   container.addEventListener('input', onInput);

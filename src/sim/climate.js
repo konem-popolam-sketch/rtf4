@@ -26,7 +26,7 @@ export function timeOfDayOf(minutes) {
 
 export function seasonOfDay(day, startSeason = 'autumn') {
   const idx = Math.max(0, SEASON_ORDER.indexOf(startSeason));
-  const seasonsPassed = Math.floor(Math.max(0, Number(day) || 1 - 1) / DAYS_PER_SEASON);
+  const seasonsPassed = Math.floor(Math.max(0, (Number(day) || 1) - 1) / DAYS_PER_SEASON);
   const shifted = idx + seasonsPassed;
   return SEASON_ORDER[((shifted % 4) + 4) % 4];
 }
@@ -86,6 +86,9 @@ export function createClimate({ seed = 'climate', startMinutes = 360, startDay =
     minutes: clamp(Number(startMinutes) || 0, 0, 1439),
     day: Math.max(1, Math.floor(Number(startDay) || 1)),
     season,
+    // Сезон первого дня — точка отсчёта. Без неё seasonOfDay(c.day, c.season)
+    // считал бы пройденные сезоны от уже сдвинутого сезона и прокручивал круг каждый шаг.
+    baseSeason: season,
     weather,
     changeTimer: 120 + random() * 300, // игровые минуты до пересмотра погоды
     pressureHistory: [weather.pressure],
@@ -153,7 +156,7 @@ export function stepClimate(climate, dtSec, timeScale = 1) {
     changed = true;
   }
 
-  const newSeason = seasonOfDay(c.day, c.season);
+  const newSeason = seasonOfDay(c.day, c.baseSeason || c.season);
   if (newSeason !== c.season) {
     c.season = newSeason;
     changed = true;

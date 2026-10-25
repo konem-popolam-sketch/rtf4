@@ -75,7 +75,8 @@ function buildReeds(reedTex) {
   for (let i = 0; i < count; i++) {
     // Две куртины по краям, чтобы середина воды оставалась свободной для заброса.
     const side = i % 2 === 0 ? -1 : 1;
-    pos.set(side * (12 + rnd() * 62), 0.9, 2.6 + rnd() * 4.6);
+    // Основание креста — на уровне земли, иначе камыш «висит» в воздухе.
+    pos.set(side * (12 + rnd() * 62), 0.015, 2.6 + rnd() * 4.6);
     q.setFromAxisAngle(axisY, rnd() * Math.PI);
     const s = 0.72 + rnd() * 0.8;
     scale.set(s, s * (0.85 + rnd() * 0.5), s);
@@ -156,7 +157,15 @@ function buildPier(boats) {
   if (boats > 1) {
     add(new THREE.BoxGeometry(1.2, 0.34, 2.8), boatMat, -9.5, 0.13, -3.2, -0.5);
   }
-  return { group, geoms, mats: [woodMat, darkMat, boatMat] };
+  // Список лодок по группам: [0] — первая у мостков, [1] — вторая в отдалении.
+  const boatGroups = [];
+  for (const child of group.children) {
+    if (child.material !== boatMat) continue;
+    const far = child.position.x < -6;
+    if (!boatGroups[far ? 1 : 0]) boatGroups[far ? 1 : 0] = [];
+    boatGroups[far ? 1 : 0].push(child);
+  }
+  return { group, geoms, mats: [woodMat, darkMat, boatMat], boatGroups };
 }
 
 /** Системное время в секундах — для лёгкого покачивания камыша. */
@@ -220,13 +229,9 @@ export function createShore({ scene, ambient }) {
     reeds.mat.color.copy(reedTint);
     reeds.inst.visible = next.reeds !== false;
     const boats = Number.isFinite(next.boats) ? next.boats : 1;
-    let idx = 0;
-    for (const child of pier.group.children) {
-      // Первые три объекта — настил/сваи/доски, остальное — лодки.
-      const isBoat = child.material === pier.mats[2];
-      child.visible = !isBoat || boats > 0;
-      if (isBoat) idx++;
-      if (boats < 2 && idx > 0 && child.position.x < -6) child.visible = false;
+    for (let i = 0; i < pier.boatGroups.length; i++) {
+      const list = pier.boatGroups[i] || [];
+      for (const boat of list) boat.visible = boats > i;
     }
   }
 

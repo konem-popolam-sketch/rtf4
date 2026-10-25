@@ -15,7 +15,7 @@ import {
   WATER_TYPE_NAMES,
 } from './common.js';
 import { fmtInt, fmtKg, plural } from '../../core/util.js';
-import { baitName, fishes, fishName, lureName, waterOf } from './data.js';
+import { baitName, fishes, lureName, waterOf } from './data.js';
 
 const WATER_FILTERS = [
   { id: 'all', name: 'Все водоёмы' },
@@ -55,7 +55,7 @@ function fishRow(fish, rec) {
     <tr class="${caught ? 'pn-row--caught' : 'pn-row--unknown'}">
       <td class="pn-cell-main">
         <span class="pn-fishdot" style="--fish:${esc(fish.color || 'var(--c-accent)')}"></span>
-        <b>${caught ? esc(fish.name) : '???'}</b>
+        <b>${esc(fish.name)}</b>
         <span class="pn-sub">${esc(fish.latin || '')}${fish.family ? ` · ${esc(fish.family)}` : ''}</span>
       </td>
       <td>${rarityBadge(fish.rarity)}</td>
@@ -81,7 +81,7 @@ function fishCard(fish, rec) {
           <span class="pn-fishcard__shape pn-fishcard__shape--${esc(fish.shape || 'torpedo')}"></span>
         </span>
         <div class="pn-fishcard__title">
-          <b>${caught ? esc(fish.name) : 'Неизвестная рыба'}</b>
+          <b>${esc(fish.name)}</b>
           <span class="pn-sub">${esc(fish.latin || '')}</span>
           ${rarityBadge(fish.rarity)}
         </div>
@@ -239,6 +239,3 @@ export function mount(root, ctx) {
 }
 
 export const ATLAS_FISH_COUNT = fishes.length;
-
-/** Имя рыбы нужно и другим панелям — реэкспорт без дублирования логики. */
-export { fishName };

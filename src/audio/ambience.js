@@ -137,15 +137,14 @@ function stop(st) {
 /**
  * Создать атмосферу. Аргумент — AudioContext или функция, возвращающая его
  * (до unlock контекста ещё нет: удобно передать `() => audio.context`).
- * Если контекст не передан, берётся общий контекст из sfx.js — тогда start()
- * сработает сразу после unlock, даже если фабрику создали раньше.
+ * Если контекста нет (null/undefined), берётся общий контекст из sfx.js — тогда
+ * start() сработает сразу после unlock, даже если фабрику создали раньше.
  */
 export function createAmbience(audioCtx) {
+  const direct = resolveContext(audioCtx);
   const st = {
-    ctx: resolveContext(audioCtx),
-    // Без аргумента берём общий контекст из sfx.js (лениво, на момент start),
-    // явный null означает «звука нет» — тогда все методы тихие no-op.
-    input: audioCtx === undefined ? getAudioContext : audioCtx,
+    ctx: direct,
+    input: direct ? audioCtx : getAudioContext,
     out: null,
     noise: null,
     wind: null,

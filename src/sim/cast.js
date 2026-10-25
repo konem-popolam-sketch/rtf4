@@ -1,10 +1,10 @@
 /**
  * cast.js — физика заброса, точность и дрейф поплавка. Чистая логика, без DOM и three.js.
  *
- * Система координат сцены: рыбак стоит на берегу в точке (0, 8), вода уходит в -Z.
+ * Система координат сцены: рыбак стоит на берегу в точке SHORE_POINT = (0, 8), вода уходит в -Z.
  * Углы в градусах отсчитываются от +Z по часовой стрелке: вектор направления —
- * (sin(deg), cos(deg)). windDirDeg — куда дует ветер, castDirDeg — куда летит снасть.
- * Совпадение направлений (cos = 1) означает попутный ветер.
+ * (sin(deg), cos(deg)). windDir — куда дует ветер (канон поля в state.world.weather),
+ * castDirDeg — куда летит снасть. Совпадение направлений (cos = 1) — попутный ветер.
  */
 import { clamp } from '../core/util.js';
 
@@ -44,12 +44,14 @@ function sinkerBonus(sinkerWeightG, alignment) {
 
 /**
  * Дальность заброса. power01 — сила замаха 0..1 (растёт, пока игрок держит ЛКМ).
+ * Направление ветра принимается как windDir (канон) либо как windDirDeg (старый алиас).
  * Идеальное окно 0.62..0.78; пересиленный заброс улетает за предел снасти и теряет точность.
  */
 export function castDistance({
   rodCastRangeM,
   power01,
   windMs,
+  windDir,
   windDirDeg,
   castDirDeg,
   skillCasting,
@@ -59,7 +61,7 @@ export function castDistance({
   const power = clamp(num(power01, 0.5), 0, 1);
   const wind = Math.max(0, num(windMs, 0));
   const skill = clamp(num(skillCasting, 0), 0, 10);
-  const alignment = windAlignment(windDirDeg, castDirDeg);
+  const alignment = windAlignment(num(windDir, num(windDirDeg, 0)), castDirDeg);
 
   // Базовая дуга заброса: даже слабый замах бросает снасть вперёд.
   let distM = range * (0.45 + 0.55 * power);
@@ -102,7 +104,7 @@ const CURRENT_FACTOR = { river: 1, lake: 0.5, pond: 0.12, sea: 0.7 };
  * Дрейф поплавка от течения и ветра. Возвращает смещение от точки заброса.
  * Река тянет по +X, озеро вдвое слабее, пруд почти не тянет, море — 0.7 от реки плюс волна.
  */
-export function bobberDrift({ distM, minutes, windMs, windDirDeg, waterType }) {
+export function bobberDrift({ distM, minutes, windMs, windDir, windDirDeg, waterType }) {
   const dist = Math.max(MIN_CAST_M, num(distM, 10));
   const mins = clamp(num(minutes, 0), 0, 240);
   const wind = Math.max(0, num(windMs, 0));
@@ -120,7 +122,8 @@ export function bobberDrift({ distM, minutes, windMs, windDirDeg, waterType }) {
   }
 
   // Ветер гонит поплавок по своему направлению.
-  const w = dirVector(windDirDeg);
+  // Канон поля в состоянии — windDir; windDirDeg оставлен для обратной совместимости.
+  const w = dirVector(num(windDir, num(windDirDeg, 0)));
   const windPush = wind * 0.02 * mins;
   x += w.x * windPush;
   z += w.z * windPush;
@@ -164,13 +167,14 @@ export function applyCast({ spot, stats, power01, skillCasting, weather, rng }) 
   const aim = aimAt(spot);
 
   const windMs = Math.max(0, num(weather?.windMs, 0));
-  const windDirDeg = num(weather?.windDirDeg, 0);
+  // Канон поля в state.world.weather и climate.js — windDir; windDirDeg — старый алиас.
+  const windDir = num(weather?.windDir, num(weather?.windDirDeg, 0));
 
   const cast = castDistance({
     rodCastRangeM: s.castRangeM,
     power01,
     windMs,
-    windDirDeg,
+    windDir,
     castDirDeg: aim.castDirDeg,
     skillCasting,
     sinkerWeightG: s.sinkerWeightG,

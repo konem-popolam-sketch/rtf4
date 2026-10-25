@@ -8,7 +8,7 @@ import { buildRecipes } from './recipes.js';
 const VOLUMES = { master: 0.85, sfx: 0.9, ambient: 0.6 };
 const volumeListeners = new Set();
 const curveCache = new Map();
-const core = { ctx: null, master: null, sfxBus: null, noise: null, unlocked: false, offBus: null, gestureOff: null, sounds: null };
+const core = { ctx: null, master: null, sfxBus: null, noise: null, unlocked: false, offBus: null, gestureOff: null };
 
 const clamp01 = (value, fallback) => {
   const n = Number(value);

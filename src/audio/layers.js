@@ -3,15 +3,15 @@
  * точечные всплески и птицы. Всё синтез, без файлов. Обслуживает ambience.js.
  */
 
-/** Настройки атмосферы по водоёму: сила ветра, воды, птиц и высота «гула». */
+/** Настройки атмосферы по водоёму: сила ветра, воды, птиц и всплесков. */
 export const SCENES = {
-  volga: { wind: 0.5, water: 0.55, gurgleHz: 260, birds: 0.9, wave: 1.0 },
-  seliger: { wind: 0.38, water: 0.62, gurgleHz: 210, birds: 1.0, wave: 0.9 },
-  prud_dachny: { wind: 0.22, water: 0.42, gurgleHz: 300, birds: 1.1, wave: 0.7 },
-  azov: { wind: 0.78, water: 0.8, gurgleHz: 150, birds: 0.7, wave: 1.4 },
+  volga: { wind: 0.5, water: 0.55, birds: 0.9, wave: 1.0 },
+  seliger: { wind: 0.38, water: 0.62, birds: 1.0, wave: 0.9 },
+  prud_dachny: { wind: 0.22, water: 0.42, birds: 1.1, wave: 0.7 },
+  azov: { wind: 0.78, water: 0.8, birds: 0.7, wave: 1.4 },
 };
 
-export const DEFAULT_SCENE = { wind: 0.4, water: 0.5, gurgleHz: 240, birds: 0.9, wave: 1.0 };
+export const DEFAULT_SCENE = { wind: 0.4, water: 0.5, birds: 0.9, wave: 1.0 };
 
 /**
  * AudioContext из аргумента: сам контекст, объект с .context, фабрика-функция

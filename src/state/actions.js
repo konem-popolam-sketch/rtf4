@@ -17,10 +17,8 @@ const MAX_FISH = 120;
 const MAX_LOG = 200;
 const RIGS = ['float', 'spinning', 'feeder', 'bottom'];
 const TACKLE_KEYS = ['rodId', 'reelId', 'lineId', 'hookId', 'floatId', 'sinkerId', 'feederId'];
-const VOLUME_KEYS = ['master', 'sfx', 'ambient'];
-const st = () => getState();
+const VOLUME_KEYS = ['master', 'sfx', 'ambient'];const st = () => getState();
 const toast = (text, kind = 'bad') => bus.emit('toast', { text, kind });
-
 function invChanged() {
   const s = st();
   if (s) bus.emit('inventory:changed', s.inventory);
@@ -70,8 +68,7 @@ export function addXp(amount) {
 export function levelUpCheck() {
   const s = st();
   return Boolean(s) && s.player.xp >= xpNext(s.player.level);
-}
-export function addBait(id, qty = 1) {
+}export function addBait(id, qty = 1) {
   const s = st();
   if (!s || !BAIT_BY_ID[id]) return 0;
   const n = Math.max(1, Math.floor(Number(qty) || 1));
@@ -279,7 +276,7 @@ export function setWater(id) {
   if (cost > 0 && !spend(cost)) return false;
   s.world.waterId = id;
   const sameSpot = water.spots.some((spot) => spot.id === s.world.spotId);
-  if (!sameSpot) s.world.spotId = water.spots[0] ? water.spots[0].id : null;
+  s.world.spotId = sameSpot ? s.world.spotId : (water.spots[0] ? water.spots[0].id : null);
   bus.emit('world:changed', { waterId: s.world.waterId, spotId: s.world.spotId });
   toast(`${water.name}: добро пожаловать на воду.`, 'info');
   markChanged();

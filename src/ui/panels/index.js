@@ -99,6 +99,8 @@ export function initPanels({ bus, state, actions, root } = {}) {
   }
 
   function setPanelViaStore(name) {
+    const store = lazyState();
+    if (!store || !store.ui) return false;
     const storeActions = lazyActions();
     if (storeActions && typeof storeActions.setPanel === 'function') {
       storeActions.setPanel(name);

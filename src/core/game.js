@@ -73,6 +73,16 @@ export function createGame({ state, renderer, bus: b }) {
     return FISH.filter((f) => Array.isArray(f.water) && f.water.includes(type));
   }
 
+  /**
+   * Держит state.world.weather той же ссылкой, что и game.climate.weather.
+   * Синхронизация нужна каждый кадр, а не только при cl.changed: климат плавно
+   * подмешивает погоду постоянно, поэтому сейв иначе отстаёт от реальной погоды.
+   * markChanged() здесь не зовём — иначе автосейв срабатывал бы каждый кадр.
+   */
+  function syncWeather() {
+    state.world.weather = game.climate.weather;
+  }
+
   function setPhase(next) {
     if (game.phase === next) return;
     game.phase = next;
@@ -293,6 +303,8 @@ export function createGame({ state, renderer, bus: b }) {
     // Климат: время идёт по игровым минутам.
     const before = game.climate;
     const cl = stepClimate(before, dt, scale);
+    // Погоду держим синхронной каждый кадр — климат меняет её плавно и постоянно.
+    syncWeather();
     if (cl.changed) {
       state.world.minutes = Math.floor(cl.minutes);
       state.world.day = cl.day;
@@ -372,6 +384,9 @@ export function createGame({ state, renderer, bus: b }) {
       startDay: state.world.day,
       season: state.world.season,
     });
+    // Новый климат — сразу отдаём его погоду в состояние, иначе до первого
+    // changed-кадра HUD и заброс жили бы со стартовой погодой из сейва.
+    syncWeather();
     const water = currentWater();
     game.scene?.setWater?.(water);
     game.renderer?.setWater?.(water);

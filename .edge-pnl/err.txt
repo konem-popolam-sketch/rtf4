@@ -1,0 +1,14 @@
+[1025/233139.482:ERROR:third_party\crashpad\crashpad\client\crashpad_client_win.cc:457] OpenProcess: Отказано в доступе. (0x5)
+[66288:48692:1025/233139.598:FATAL:mojo\public\cpp\platform\platform_channel.cc:187] Check failed: . : Отказано в доступе. (0x5)
+[1025/233139.601:ERROR:third_party\crashpad\crashpad\client\crashpad_client_win.cc:159] crash server failed to launch
+[66288:60672:1025/233139.604:ERROR:chrome\installer\util\google_update_settings_win.cc:544] Failed opening key Software\Microsoft\EdgeUpdate\ClientStateMedium\{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062} to set usagestats; result: 5
+[66288:60672:1025/233139.606:ERROR:chrome\installer\util\google_update_settings_win.cc:587] Failed opening key Software\Microsoft\EdgeUpdate\ClientStateMedium\{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062} to set urlstats; result: 5
+[66288:46452:1025/233139.640:ERROR:content\browser\network_sandbox.cc:418] Failed to grant sandbox access to cache directory C:\Users\Igor\Downloads\rtf4\.edge-pnl\Default\Cache\Cache_Data: Отказано в доступе. (0x5)
+[66288:46452:1025/233139.651:ERROR:content\browser\network_sandbox.cc:338] Failed to grant sandbox access to SharedDictionary directory C:\Users\Igor\Downloads\rtf4\.edge-pnl\Default\Shared Dictionary: Отказано в доступе. (0x5)
+[66288:46452:1025/233139.653:ERROR:content\browser\network_sandbox.cc:537] Failed to grant sandbox access to network context data directory C:\Users\Igor\Downloads\rtf4\.edge-pnl\Default\Network: Отказано в доступе. (0x5)
+
+DevTools listening on ws://127.0.0.1:9341/devtools/browser/ac3deab4-ed6f-4032-9d47-dc66c4aded5a
+[66288:60672:1025/233139.789:ERROR:chrome\installer\util\google_update_settings_win.cc:544] Failed opening key Software\Microsoft\EdgeUpdate\ClientStateMedium\{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062} to set usagestats; result: 5
+[66288:60672:1025/233140.545:ERROR:content\browser\network_sandbox.cc:418] Failed to grant sandbox access to cache directory C:\Users\Igor\Downloads\rtf4\.edge-pnl\Default\Storage\ext\ihmafllikibpmigkcoadcmckbfhibefp\def\Cache\Cache_Data: Отказано в доступе. (0x5)
+[66288:60672:1025/233140.546:ERROR:content\browser\network_sandbox.cc:338] Failed to grant sandbox access to SharedDictionary directory C:\Users\Igor\Downloads\rtf4\.edge-pnl\Default\Storage\ext\ihmafllikibpmigkcoadcmckbfhibefp\def\Shared Dictionary: Отказано в доступе. (0x5)
+[66288:60672:1025/233140.548:ERROR:content\browser\network_sandbox.cc:537] Failed to grant sandbox access to network context data directory C:\Users\Igor\Downloads\rtf4\.edge-pnl\Default\Storage\ext\ihmafllikibpmigkcoadcmckbfhibefp\def\Network: Отказано в доступе. (0x5)

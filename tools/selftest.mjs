@@ -156,8 +156,15 @@ function runFight(createFight, stepFight, { fish, tackle, seed, input, maxSec = 
 }
 
 let rngFactory = null;
+/** Детерминированный ГПСЧ для фикстур: настоящий mulberry32, если модуль доступен. */
 function mulberry32For(seed) {
-  return rngFactory(seed);
+  if (typeof rngFactory === 'function') return rngFactory(seed);
+  // Резервный LCG: тесты боя должны оставаться детерминированными, даже если rng.js сломан.
+  let state = (Number(seed) || 1) >>> 0;
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
 }
 
 /* ─────────────────────────── прогон ─────────────────────────── */
@@ -170,8 +177,9 @@ async function main() {
   /* ---------- src/core/rng.js ---------- */
   group('rng.js — детерминированный ГПСЧ');
   const rngPath = 'src/core/rng.js';
-  rngFactory = (await loadModule(rngPath, ['mulberry32'])).mod?.mulberry32 || null;
-  if (!rngFactory) rngFactory = () => 0;
+  const rngEntry = await loadModule(rngPath, ['mulberry32', 'hashSeed', 'pickWeighted']);
+  if (rngEntry.mod && typeof rngEntry.mod.mulberry32 === 'function') rngFactory = rngEntry.mod.mulberry32;
+  else console.log(`  (модуль недоступен, фикстуры используют резервный ГПСЧ: ${rngEntry.error})`);
 
   await test('mulberry32: одинаковый seed → одинаковая последовательность', async () => {
     const { mulberry32 } = await useModule(rngPath, ['mulberry32']);
@@ -453,35 +461,45 @@ async function main() {
     return `${bites}/${checked} поклёвок, delaySec в 4..120`;
   });
 
-  await test('evaluateBite: наживка вне рациона не выбирает эту рыбу', async () => {
+  await test('evaluateBite: чужая наживка у единственной рыбы — поклёвки нет', async () => {
     needBite();
     const { mulberry32 } = await useModule(rngPath, ['mulberry32']);
-    const bait = { ...BAIT_CHERV, id: 'kukuruza', attraction: { small: 0.8, medium: 0.8, big: 0.8 } };
-    const fish = makeFish('okun', { bait: ['cherv', 'oparysh'] });
-    let okunCount = 0;
-    for (let seed = 1; seed <= 120; seed += 1) {
-      const result = evaluateBite(biteCase({ fishTable: [fish], bait, rng: mulberry32(seed) }));
-      inRange(result.delaySec, 4, 120, 'delaySec');
-      // Одна несовместимая рыба в таблице: выбор всегда падает на неё, но поклёвка — не гарантия.
-      if (result.willBite && result.chosenFishId === 'okun') okunCount += 1;
+    const fish = makeFish('karp', { bait: ['cherv', 'oparysh'], lure: [] });
+    const bait = { ...BAIT_CHERV, id: 'kukuruza', attraction: { small: 0.9, medium: 0.9, big: 0.9 } };
+    const bites = [];
+    for (let seed = 1; seed <= 30; seed += 1) {
+      const result = evaluateBite(biteCase({ fishTable: [fish], bait, lure: null, rng: mulberry32(seed) }));
+      inRange(result.delaySec, 4, 120, `delaySec (seed=${seed})`);
+      if (result.willBite) bites.push(seed);
     }
-    ok(okunCount <= 120, `выборов «okun»: ${okunCount}`);
-    return `несовместимая наживка: ${okunCount}/120 выборов (мягкий штраф веса)`;
+    ok(
+      bites.length === 0,
+      `на неподходящую наживку «kukuruza» поклёвка случилась в ${bites.length}/30 сидов ` +
+        `(сиды ${bites.slice(0, 5).join(', ')}). Контракт: willBite=false, если наживка не входит в fish.bait. ` +
+        'Правится в src/sim/bite.js: willBiteChance должен учитывать вес совпадения наживки.',
+    );
+    return '30/30 отказов';
   });
 
-  await test('evaluateBite: приманка, которой нет у рыбы, — поклёвки нет', async () => {
+  await test('evaluateBite: чужая приманка у единственной рыбы — поклёвки нет', async () => {
     needBite();
     const { mulberry32 } = await useModule(rngPath, ['mulberry32']);
-    const fish = makeFish('karp', { lure: ['vobler_ton'], bait: [] });
-    const results = [];
+    const fish = makeFish('karp', { bait: [], lure: ['vobler_ton', 'dzhig'] });
+    const bites = [];
     for (let seed = 1; seed <= 30; seed += 1) {
-      const result = evaluateBite(biteCase({ fishTable: [fish], bait: null, lure: LURE_VERTUSHKA, rng: mulberry32(seed) }));
-      inRange(result.delaySec, 4, 120, 'delaySec');
-      eq(result.willBite, false, `willBite при чужой приманке (seed=${seed})`);
-      eq(result.chosenFishId, null, 'chosenFishId при чужой приманке');
-      results.push(result);
+      const result = evaluateBite(
+        biteCase({ fishTable: [fish], bait: null, lure: LURE_VERTUSHKA, rng: mulberry32(seed) }),
+      );
+      inRange(result.delaySec, 4, 120, `delaySec (seed=${seed})`);
+      if (result.willBite) bites.push(seed);
     }
-    return `${results.length}/${results.length} отказов, chosenFishId=null`;
+    ok(
+      bites.length === 0,
+      `на чужую приманку «vertushka» поклёвка случилась в ${bites.length}/30 сидов ` +
+        `(сиды ${bites.slice(0, 5).join(', ')}). Контракт: willBite=false, если приманки нет в fish.lure. ` +
+        'Правится в src/sim/bite.js.',
+    );
+    return '30/30 отказов';
   });
 
   await test('evaluateBite: совпадающая наживка выбирается чаще несовпадающей', async () => {
@@ -578,31 +596,60 @@ async function main() {
   await test('stepClimate: сезон меняется раз в 7 игровых дней', async () => {
     needClimate();
     const order = ['spring', 'summer', 'autumn', 'winter'];
-    const startSeason = 'autumn';
-    const startIdx = order.indexOf(startSeason);
-    const expectedSeason = (day) => order[(startIdx + Math.floor((day - 1) / 7)) % 4];
-    const climate = createClimate({ seed: 'season', startMinutes: 0, startDay: 1, season: startSeason });
-    const changesPerDay = new Map();
+    const climate = createClimate({ seed: 'season', startMinutes: 0, startDay: 1, season: 'autumn' });
+    const seasonsByDay = new Map(); // день → множество сезонов, увиденных в этот день
+    const orderViolations = [];
+    const changeDays = [];
     let previousSeason = climate.season;
     let previousDay = climate.day;
-    let totalChanges = 0;
-    for (let step = 0; step < 60 * 24 * 16; step += 1) {
-      stepClimate(climate, 0.25, 60); // 15 игровых минут за шаг, 96 шагов в сутках
+    const remember = () => {
+      if (!seasonsByDay.has(climate.day)) seasonsByDay.set(climate.day, new Set());
+      seasonsByDay.get(climate.day).add(climate.season);
+    };
+    remember();
+    // 40 игровых дней по 15 игровых минут за шаг — с запасом на 5 смен сезона.
+    for (let step = 0; step < 96 * 40; step += 1) {
+      stepClimate(climate, 0.25, 60);
+      remember();
       if (climate.season !== previousSeason) {
-        totalChanges += 1;
-        changesPerDay.set(climate.day, (changesPerDay.get(climate.day) || 0) + 1);
+        if (!order.includes(climate.season)) orderViolations.push(`неизвестный сезон «${climate.season}»`);
+        const prevIdx = order.indexOf(previousSeason);
+        const nextExpected = order[(prevIdx + 1) % 4];
+        if (nextExpected !== climate.season) {
+          orderViolations.push(`после «${previousSeason}» ожидался «${nextExpected}», получен «${climate.season}»`);
+        }
+        if (climate.day !== previousDay) changeDays.push(climate.day);
         previousSeason = climate.season;
       }
-      if (climate.day !== previousDay) {
-        previousDay = climate.day;
-        eq(climate.season, expectedSeason(climate.day), `сезон на дне ${climate.day}`);
-      }
+      previousDay = climate.day;
     }
-    const maxPerDay = Math.max(0, ...changesPerDay.values());
-    ok(maxPerDay <= 1, `сезон менялся ${maxPerDay} раз за один игровой день — это не «раз в 7 дней»`);
-    const expectedChanges = Math.floor((climate.day - 1) / 7);
-    ok(Math.abs(totalChanges - expectedChanges) <= 1, `смен сезона ${totalChanges}, ожидалось ~${expectedChanges} за ${climate.day} дней`);
-    return `${totalChanges} смен за ${climate.day} дней, максимум ${maxPerDay} в день`;
+
+    // 1. Главный симптом: сезон дёргается несколько раз за один игровой день.
+    const noisyDays = [...seasonsByDay.entries()].filter(([, set]) => set.size > 1);
+    ok(
+      noisyDays.length === 0,
+      `сезон скачет внутри игрового дня: ${noisyDays
+        .slice(0, 3)
+        .map(([day, set]) => `день ${day} — ${[...set].join('/')}`)
+        .join('; ')}. Контракт SPEC §2: смена сезона каждые 7 игровых дней. ` +
+        'Причина в src/sim/climate.js: stepClimate вызывает seasonOfDay(c.day, c.season) уже с ' +
+        'изменённым c.season, поэтому каждый шаг добавляет ещё одну смену.',
+    );
+
+    // 2. Порядок сезонов: весна → лето → осень → зима → весна.
+    ok(orderViolations.length === 0, `нарушен порядок сезонов: ${orderViolations.slice(0, 3).join('; ')}`);
+
+    // 3. Ровно одна смена на каждые 7 дней, начиная с 7-го.
+    const seenDays = Math.max(...seasonsByDay.keys());
+    const expectedChanges = Math.floor(seenDays / 7);
+    ok(
+      changeDays.length === expectedChanges,
+      `смен сезона ${changeDays.length}, ожидалось ${expectedChanges} за ${seenDays} игровых дней`,
+    );
+    for (let i = 1; i < changeDays.length; i += 1) {
+      eq(changeDays[i] - changeDays[i - 1], 7, `интервал между сменами (дни ${changeDays[i - 1]}→${changeDays[i]})`);
+    }
+    return `${changeDays.length} смен ровно через 7 дней (дни ${changeDays.join(', ')})`;
   });
 
   await test('stepClimate: флаг changed реагирует на смену фазы суток', async () => {

@@ -17,17 +17,24 @@ function sizeClassOf(fish) {
   return SIZE_ATTRACT.big;
 }
 
-/** Совместима ли наживка/приманка с рыбой. */
+/**
+ * Совместима ли наживка/приманка с рыбой.
+ * Ноль означает «эта рыба не возьмёт такую насадку вообще» — кандидат отбрасывается.
+ * Полумеры вроде 0.08 опасны: они оставляют рыбу в списке, и поклёвка случается
+ * на заведомо чужую наживку. Контракт API §2.7 требует willBite=false.
+ */
 function baitMatch(fish, baitId, lureId) {
   if (lureId) {
     if (!Array.isArray(fish.lure) || fish.lure.length === 0) return 0;
-    return fish.lure.includes(lureId) ? 1 : 0.08;
+    if (!fish.lure.includes(lureId)) return 0;
+    // Приманка из списка: первая — профильная.
+    return fish.lure.indexOf(lureId) === 0 ? 1 : 0.72;
   }
   if (!baitId) return 0.25;
-  if (!Array.isArray(fish.bait) || fish.bait.length === 0) return 0.1;
+  if (!Array.isArray(fish.bait) || fish.bait.length === 0) return 0;
   // Первая наживка в списке — любимая, даёт полный вес.
   const idx = fish.bait.indexOf(baitId);
-  if (idx < 0) return 0.08;
+  if (idx < 0) return 0;
   return idx === 0 ? 1 : 0.72;
 }
 

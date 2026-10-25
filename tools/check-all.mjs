@@ -91,8 +91,10 @@ function tidyNodeError(raw, res) {
  * `node --check` дочерним процессом. Пайпы в песочнице дают EPERM,
  * поэтому stderr направляем в файл (fd), а не в pipe.
  * Возвращает null, если спавн недоступен — тогда работает встроенный разбор.
+ * Переменная RTF4_NO_SPAWN=1 принудительно включает резервный путь (для проверки самого fallback).
  */
 function checkViaNode(file) {
+  if (process.env.RTF4_NO_SPAWN) return null;
   let errFile;
   try {
     errFile = join(getTempDir(), 'stderr.txt');
@@ -131,29 +133,48 @@ function checkViaNode(file) {
   return { status: res.status, message: res.status === 0 ? '' : tidyNodeError(raw, res) };
 }
 
-/** Снимает ESM-обвязку, чтобы проверить тело скрипта через new Function (резервный путь). */
+/**
+ * Снимает ESM-обвязку, чтобы проверить тело скрипта через new Function (резервный путь).
+ * Поддерживает многострочные `export { … }` / `import { … } from`, `export default`, `export *`.
+ */
 function stripModuleSyntax(source) {
-  return source
-    .split('\n')
-    .map((line) => {
-      const t = line.trim();
-      if (/^import\s/.test(t) || /^import\s*\(/.test(t)) return '';
-      if (/^export\s*\{/.test(t) || /^export\s*\*/.test(t)) return '';
-      return line
-        .replace(/^(\s*)export\s+default\s+/, '$1')
-        .replace(/^(\s*)export\s+(?=(?:async\s+)?(?:function|class|const|let|var)\b)/, '$1');
-    })
-    .join('\n');
+  let code = source;
+  // import … from '…';  |  import '…';  — вместе с многострочными списками имён.
+  code = code.replace(/\bimport\s+(?:[\s\S]*?\s+from\s+)?(['"])[^'"]+\1\s*;?/g, (match) =>
+    match.includes('import(') ? match : '',
+  );
+  // export … from '…';  и  export * from '…';
+  code = code.replace(/\bexport\s+(?:\*(?:\s+as\s+[\w$]+)?|\{[\s\S]*?\})\s*from\s*(['"])[^'"]+\1\s*;?/g, '');
+  // export { a, b as c };
+  code = code.replace(/\bexport\s*\{[\s\S]*?\}\s*;?/g, '');
+  // export default <expr>  →  const __default = <expr>
+  code = code.replace(/\bexport\s+default\s+(?=(?:async\s+)?function\b|class\b|[\w$])/g, 'const __default__ = ');
+  // export default function/class без имени
+  code = code.replace(/\bexport\s+default\s+/g, 'const __default__ = ');
+  // export const/let/var/function/class/async function
+  code = code.replace(/\bexport\s+(?=(?:async\s+)?(?:function|class|const|let|var)\b)/g, '');
+  return code;
 }
 
 function checkInProcess(source) {
+  const stripped = stripModuleSyntax(source);
   try {
     // eslint-disable-next-line no-new-func
-    new Function(stripModuleSyntax(source));
-    return { ok: true, message: '' };
+    new Function(stripped);
   } catch (err) {
     return { ok: false, message: `встроенный разбор: ${err.message}` };
   }
+  // `import.meta` живёт только в модулях: после снятия обвязки он невалиден в Function-теле.
+  const metaFree = stripped.replace(/\bimport\s*\.\s*meta\b/g, '({})');
+  if (metaFree !== stripped) {
+    try {
+      // eslint-disable-next-line no-new-func
+      new Function(metaFree);
+    } catch (err) {
+      return { ok: false, message: `встроенный разбор: ${err.message}` };
+    }
+  }
+  return { ok: true, message: '' };
 }
 
 function checkJsSyntax(file, source) {
@@ -223,16 +244,25 @@ function checkCssStructure(source) {
 
 /* ─────────────────────── 3. Связность модулей (импорты) ─────────────────────── */
 
-/** Убирает комментарии, сохраняя номера строк, чтобы не ловить импорты из примеров в доке. */
+/**
+ * Убирает комментарии, сохраняя номера строк, чтобы не ловить импорты из примеров в доке.
+ * Учитывает строки, шаблонные литералы и регулярные выражения: внутри `/['"]/g` кавычка
+ * не открывает строку, иначе сканер разъезжается и «находит» импорты в комментариях.
+ */
 function stripComments(source) {
   let out = '';
   let i = 0;
   let inLine = false;
   let inBlock = false;
   let quote = '';
+  // Последний значимый символ — по нему решаем, начинается ли регулярка или это деление.
+  let prevSignificant = '';
+  const regexAllowedAfter = /[([{,;:=!&|?+\-*%^~<>]$/;
+
   while (i < source.length) {
     const ch = source[i];
     const next = source[i + 1];
+
     if (inLine) {
       if (ch === '\n') {
         inLine = false;
@@ -241,6 +271,7 @@ function stripComments(source) {
       i += 1;
       continue;
     }
+
     if (inBlock) {
       if (ch === '*' && next === '/') {
         inBlock = false;
@@ -252,6 +283,7 @@ function stripComments(source) {
       i += 1;
       continue;
     }
+
     if (quote) {
       if (ch === '\\') {
         out += '  ';
@@ -263,6 +295,38 @@ function stripComments(source) {
       i += 1;
       continue;
     }
+
+    // Регулярное выражение: `/…/flags`. Внутри — свои экранирования и классы `[…]`.
+    if (ch === '/' && next !== '/' && next !== '*' && (prevSignificant === '' || regexAllowedAfter.test(prevSignificant))) {
+      let j = i + 1;
+      let inClass = false;
+      let closed = false;
+      while (j < source.length) {
+        const cj = source[j];
+        if (cj === '\n') break; // незакрытая регулярка — не наш случай
+        if (cj === '\\') {
+          j += 2;
+          continue;
+        }
+        if (cj === '[') inClass = true;
+        else if (cj === ']') inClass = false;
+        else if (cj === '/' && !inClass) {
+          closed = true;
+          j += 1;
+          break;
+        }
+        j += 1;
+      }
+      if (closed) {
+        // Флаги регулярки.
+        while (j < source.length && /[a-z]/i.test(source[j])) j += 1;
+        out += ' '.repeat(j - i);
+        i = j;
+        prevSignificant = '/';
+        continue;
+      }
+    }
+
     if (ch === '/' && next === '/') {
       inLine = true;
       out += '  ';
@@ -276,6 +340,7 @@ function stripComments(source) {
       continue;
     }
     if (ch === '"' || ch === "'" || ch === '`') quote = ch;
+    if (!/\s/.test(ch)) prevSignificant = ch;
     out += ch;
     i += 1;
   }
@@ -291,24 +356,50 @@ function lineAt(source, index) {
 function findImports(source) {
   const code = stripComments(source);
   const found = [];
-  const push = (spec, index) => {
+  const push = (spec, index, soft = false) => {
     if (!spec) return;
     const line = lineAt(code, index);
-    if (found.some((item) => item.spec === spec && item.line === line)) return;
-    found.push({ spec, line });
+    const existing = found.find((item) => item.spec === spec && item.line === line);
+    if (existing) {
+      existing.soft = existing.soft || soft;
+      return;
+    }
+    found.push({ spec, line, soft });
   };
-  const patterns = [
-    /\bfrom\s*(['"])([^'"]+)\1/g, // import … from '…'  |  export … from '…'
-    /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g, // динамический import('…')
-    /(?:^|[\n;{}])\s*import\s*(['"])([^'"]+)\1/g, // import '…'
-    // Путь модуля строковым литералом: загрузчики вида optional('./ui/hud.js') в main.js.
-    /(['"])(\.{1,2}\/[^'"\n]+\.m?js)\1/g,
-  ];
-  for (const re of patterns) {
-    let m;
-    while ((m = re.exec(code)) !== null) push(m[2], m.index);
+  // Мягкий импорт — тот, чья ошибка перехвачена: .catch(…) или обёртка вида optional('…').
+  const isGuarded = (index) => /^\s*(?:\)\s*)?\.catch\s*\(/.test(code.slice(index, index + 24));
+  const SOFT_CALLER = /\b(optional|maybe|tryLoad|softLoad|lazyLoad|lazy|ensure)\s*$/i;
+
+  const dynamicRe = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
+  let m;
+  while ((m = dynamicRe.exec(code)) !== null) {
+    const guarded = isGuarded(dynamicRe.lastIndex);
+    push(m[2], m.index, guarded);
+  }
+  const fromRe = /\bfrom\s*(['"])([^'"]+)\1/g;
+  while ((m = fromRe.exec(code)) !== null) push(m[2], m.index, false);
+  const bareRe = /(?:^|[\n;{}])\s*import\s*(['"])([^'"]+)\1/g;
+  while ((m = bareRe.exec(code)) !== null) push(m[2], m.index, false);
+  // Путь модуля строковым литералом в вызове загрузчика: optional('./ui/hud.js') в main.js.
+  // Именно вызов функции, а не любая строка, — иначе ловятся значения вида './vendor/three.module.js'.
+  const pathRe = /\b([\w$]+)\s*\(\s*(['"])(\.{1,2}\/[^'"\n]+\.m?js)\2\s*\)/g;
+  while ((m = pathRe.exec(code)) !== null) {
+    if (m[1] === 'import') continue; // уже учтено выше
+    push(m[3], m.index, SOFT_CALLER.test(m[1]));
   }
   return found;
+}
+
+/** Все .js-файлы src с их базовыми именами — чтобы подсказать правильный путь при опечатке. */
+function makeBasenameIndex() {
+  const index = new Map();
+  for (const abs of walk(join(ROOT, 'src'))) {
+    if (!JS_EXT.has(extname(abs).toLowerCase())) continue;
+    const base = abs.split(sep).pop();
+    if (!index.has(base)) index.set(base, []);
+    index.get(base).push(relOf(abs));
+  }
+  return index;
 }
 
 function readImportMap() {
@@ -340,17 +431,39 @@ const BANNED_SPECIFIERS = [
   { re: /(?:unpkg|jsdelivr|cdnjs|esm\.sh)/, text: 'внешний CDN запрещён (SPEC §0)' },
 ];
 
-function resolveSpecifier(file, spec, importMap) {
+/** Встроенные модули Node — их не надо искать в дереве проекта и в import map. */
+const NODE_BUILTINS = new Set([
+  'assert', 'buffer', 'child_process', 'cluster', 'console', 'constants', 'crypto', 'dgram', 'dns',
+  'events', 'fs', 'http', 'http2', 'https', 'inspector', 'module', 'net', 'os', 'path', 'perf_hooks',
+  'process', 'punycode', 'querystring', 'readline', 'repl', 'stream', 'string_decoder', 'timers',
+  'tls', 'trace_events', 'tty', 'url', 'util', 'v8', 'vm', 'wasi', 'worker_threads', 'zlib',
+  'test', 'assert/strict', 'fs/promises', 'dns/promises', 'stream/promises', 'timers/promises',
+  'util/types', 'readline/promises', 'path/posix', 'path/win32',
+]);
+
+function isNodeBuiltin(spec) {
+  if (spec.startsWith('node:')) return true;
+  if (NODE_BUILTINS.has(spec)) return true;
+  // Подпути вида fs/promises уже перечислены; прочее с «/» — не builtin.
+  return false;
+}
+
+function resolveSpecifier(file, spec, importMap, basenames) {
   for (const banned of BANNED_SPECIFIERS) {
     if (banned.re.test(spec)) return { ok: false, message: `«${spec}»: ${banned.text}` };
   }
+  if (isNodeBuiltin(spec)) return { ok: true, abs: null, note: null, builtin: true };
   if (spec.startsWith('.') || spec.startsWith('/')) {
     const abs = spec.startsWith('/') ? join(ROOT, spec) : resolve(dirname(file), spec);
     if (existsSync(abs) && statSync(abs).isFile()) return { ok: true, abs };
     if (!extname(abs) && existsSync(`${abs}.js`)) {
       return { ok: true, abs: `${abs}.js`, note: 'импорт без расширения .js' };
     }
-    return { ok: false, message: `файл не найден: ${relOf(abs)}` };
+    // Подсказка: такой файл существует, но путь указан неверно (частая ошибка — ../ vs ../../).
+    const base = spec.split('/').pop();
+    const candidates = (basenames && basenames.get(base)) || [];
+    const hint = candidates.length > 0 ? ` (возможно, имелся в виду ${candidates.join(' или ')})` : '';
+    return { ok: false, message: `файл не найден: ${relOf(abs)}${hint}` };
   }
   const mapped = importMap[spec];
   if (!mapped) return { ok: false, message: `«${spec}» не объявлен в import map (index.html)` };
@@ -391,19 +504,23 @@ const RULES = [
 
 function lintSource(source, rel) {
   const issues = [];
-  for (const rule of RULES) {
-    if (rule.skip && rule.skip(rel)) continue;
-    const matches = source.match(rule.re);
-    if (!matches || matches.length === 0) continue;
-    const firstIndex = source.search(rule.re);
-    issues.push({
-      status: rule.status,
-      note: `${rule.text} — ${matches.length}× (первое вхождение: строка ${lineAt(source, firstIndex)})`,
-    });
-  }
-  const lineCount = source.split('\n').length;
-  if (lineCount > 400) {
-    issues.push({ status: 'WARN', note: `файл ${lineCount} строк — SPEC §5 требует ≤ 400` });
+  // tools/ — служебные скрипты, а не продакшн-код: правила SPEC §5 к ним не применяем,
+  // иначе сам чекер ловит свои же описания правил (слова-плейсхолдеры в регулярках и доке).
+  if (!rel.startsWith('tools/')) {
+    for (const rule of RULES) {
+      if (rule.skip && rule.skip(rel)) continue;
+      const matches = source.match(rule.re);
+      if (!matches || matches.length === 0) continue;
+      const firstIndex = source.search(rule.re);
+      issues.push({
+        status: rule.status,
+        note: `${rule.text} — ${matches.length}× (первое вхождение: строка ${lineAt(source, firstIndex)})`,
+      });
+    }
+    const lineCount = source.split('\n').length;
+    if (lineCount > 400) {
+      issues.push({ status: 'WARN', note: `файл ${lineCount} строк — SPEC §5 требует ≤ 400` });
+    }
   }
   return issues;
 }
@@ -472,20 +589,35 @@ function main() {
   // 2. Связность модулей
   const graphIssues = [];
   const edges = new Map();
+  const basenames = makeBasenameIndex();
   for (const [rel, source] of sources) {
     const file = join(ROOT, rel);
     const imports = findImports(source);
     const resolved = [];
+    const seenNote = new Set();
     for (const item of imports) {
-      const target = resolveSpecifier(file, item.spec, importMap);
+      const target = resolveSpecifier(file, item.spec, importMap, basenames);
       if (target.ok) {
-        resolved.push(relative(ROOT, target.abs));
-        if (target.note) {
-          graphIssues.push({ status: 'WARN', file: rel, check: 'импорт', note: `${target.note} (строка ${item.line}: «${item.spec}»)` });
+        // Встроенные модули Node (node:fs, node:path) — не файлы проекта, в граф не входят.
+        if (target.abs) resolved.push(relOf(target.abs));
+        if (target.note && !seenNote.has(target.note)) {
+          seenNote.add(target.note);
+          graphIssues.push({
+            status: 'WARN',
+            file: rel,
+            check: 'импорт',
+            note: `${target.note} (строка ${item.line}: «${item.spec}»)`,
+          });
         }
-      } else {
-        graphIssues.push({ status: 'FAIL', file: rel, check: 'импорт', note: `строка ${item.line}: ${target.message}` });
+        continue;
       }
+      // Мягкий импорт (внутри try / .catch / optional()) — не FAIL: модуль может появиться позже.
+      graphIssues.push({
+        status: item.soft ? 'WARN' : 'FAIL',
+        file: rel,
+        check: 'импорт',
+        note: `строка ${item.line}: ${target.message}${item.soft ? ' [мягкий импорт: ошибка перехвачена]' : ''}`,
+      });
     }
     edges.set(rel, resolved);
     if (!QUIET) graphIssues.push({ status: 'OK', file: rel, check: 'импорты', note: `${imports.length} шт.` });

@@ -458,14 +458,15 @@
   background: color-mix(in srgb, var(--c-good) 7%, transparent);
 }
 .pn-cell-main {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
   min-width: 150px;
 }
 .pn-cell-main b {
+  display: block;
   font-weight: 600;
   color: var(--c-text);
+}
+.pn-cell-main .pn-sub {
+  margin-top: 1px;
 }
 .pn-cell-main > span:not(.pn-sub):not(.pn-fishdot) {
   color: var(--c-text);
@@ -499,27 +500,29 @@
 
 /* ---------- Иконки-точки ---------- */
 .pn-fishdot {
+  --fish: var(--c-accent);
   display: inline-block;
   width: 9px;
   height: 9px;
   margin-right: 7px;
   border-radius: 50%;
-  background: var(--fish, var(--c-accent));
+  background: var(--fish);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-night) 60%, transparent);
   vertical-align: middle;
 }
 .pn-item__icon {
+  --tone: var(--c-accent);
   display: inline-block;
   width: 16px;
   height: 16px;
   flex: 0 0 16px;
   border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--tone, var(--c-accent)) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tone) 70%, transparent);
   background: radial-gradient(
     circle at 35% 30%,
-    color-mix(in srgb, var(--tone, var(--c-accent)) 90%, var(--c-text)),
-    var(--tone, var(--c-accent)) 60%,
-    color-mix(in srgb, var(--tone, var(--c-accent)) 45%, var(--c-night))
+    color-mix(in srgb, var(--tone) 90%, var(--c-text)),
+    var(--tone) 60%,
+    color-mix(in srgb, var(--tone) 45%, var(--c-night))
   );
 }
 
@@ -1203,9 +1206,6 @@
 }
 
 @media (min-width: 1920px) {
-  :root {
-    --hud-pad: 22px;
-  }
   .pn-sheet {
     max-width: min(1520px, 92vw);
     max-height: min(900px, 88vh);

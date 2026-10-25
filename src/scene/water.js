@@ -68,7 +68,8 @@ export function createWater({ scene, ambient }) {
     mat.emissiveIntensity = 0.16 + day * 0.28;
     mat.roughness = 0.34 - day * 0.12;
     mat.metalness = 0.22 + day * 0.1;
-    normalMap.normalScale.setScalar(0.4 + day * 0.25);
+    const ns = 0.4 + day * 0.25;
+    mat.normalScale.set(ns, ns);
   }
 
   /** Смена водоёма: цвет воды берём из ambient.waterColor. */
